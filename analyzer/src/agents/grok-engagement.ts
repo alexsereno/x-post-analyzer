@@ -32,39 +32,76 @@ const STATIC_CALIBRATION = `Calibration guidance — typical ranges for an avera
 - reportScore: 0.00005–0.002 (reporting the tweet)
 - dwellTime: 2.0–30.0 (expected dwell time in seconds, NOT a probability)`;
 
-const UNOBSERVABLE_GUIDANCE = `For actions not directly available in the examples above, use these relative guidelines:
-- clickScore: typically 2–5× the like rate (clicking to expand/read)
-- profileClickScore: roughly 0.3–0.5× the like rate
-- photoExpandScore: ~0.5–1× the like rate when images are present, else ~0
-- vqvScore: similar to photoExpand but for video, else ~0
-- shareScore: ~0.05–0.2× the like rate
-- shareViaDmScore: ~0.03–0.1× the like rate
-- shareViaCopyLinkScore: ~0.03–0.1× the like rate
-- dwellScore: 3–10× the like rate (most viewers pause to read)
-- quotedClickScore: similar to like rate if quote, else ~0
-- followAuthorScore: ~0.01–0.1× the like rate
-- notInterestedScore: typically <0.5% of impressions
-- blockAuthorScore: typically <0.05% of impressions
-- muteAuthorScore: typically <0.05% of impressions
-- reportScore: typically <0.01% of impressions
-- dwellTime: 2.0–30.0 seconds (NOT a probability)`;
+/** Clamp scores for physical constraints based on tweet metadata. */
+function clampScores(scores: PhoenixScores, input: TweetInput): PhoenixScores {
+  const clamped = { ...scores };
+
+  // Probabilities must be in [0, 1]
+  const probKeys: (keyof PhoenixScores)[] = [
+    "favoriteScore",
+    "replyScore",
+    "retweetScore",
+    "photoExpandScore",
+    "clickScore",
+    "profileClickScore",
+    "vqvScore",
+    "shareScore",
+    "shareViaDmScore",
+    "shareViaCopyLinkScore",
+    "dwellScore",
+    "quoteScore",
+    "quotedClickScore",
+    "followAuthorScore",
+    "notInterestedScore",
+    "blockAuthorScore",
+    "muteAuthorScore",
+    "reportScore",
+  ];
+  for (const key of probKeys) {
+    clamped[key] = Math.max(0, Math.min(1, clamped[key]));
+  }
+
+  // dwellTime must be non-negative
+  clamped.dwellTime = Math.max(0, clamped.dwellTime);
+
+  // No image/gif → photoExpand should be ~0
+  const hasImage = input.media === "image" || input.media === "gif";
+  if (!hasImage) {
+    clamped.photoExpandScore = 0;
+  }
+
+  // No video/gif → vqv should be ~0
+  const hasVideo = input.media === "video" || input.media === "gif";
+  if (!hasVideo) {
+    clamped.vqvScore = 0;
+  }
+
+  // Not a quote tweet → quotedClick should be ~0
+  if (!input.isQuote) {
+    clamped.quotedClickScore = 0;
+  }
+
+  return clamped;
+}
 
 function buildSystemPrompt(calibration: CalibrationTweet[] | null): string {
   const intro = `You are an engagement prediction model for the X (Twitter) recommendation algorithm.
-Given a tweet, estimate the probability that an average viewer will take each of the 19 engagement actions.`;
+Given a tweet, estimate the probability that an average viewer will take each of the 19 engagement actions.
+You were trained on massive X data — use your intuition about how tweets perform.`;
 
   const calibrationSection =
     calibration && calibration.length > 0
-      ? buildCalibrationPrompt(calibration) + "\n\n" + UNOBSERVABLE_GUIDANCE
+      ? buildCalibrationPrompt(calibration)
       : STATIC_CALIBRATION;
 
   const factors = `Factors to consider:
 - Text length, clarity, and emotional valence
-- Media type (images boost photoExpand, videos boost vqv)
+- Media type (images boost photoExpand, videos boost vqv; no media → those scores should be 0)
 - Call-to-action presence (questions boost reply, "RT if" boosts retweet)
 - Controversy potential (increases both engagement AND negative signals)
 - Follower context (larger audiences have lower per-viewer engagement rates)
 - Whether the tweet is a reply or quote (affects visibility and engagement patterns)
+- Not a quote tweet → quotedClickScore should be 0
 
 Keep estimates realistic. Most probabilities should be well under 0.10.
 dwellTime is in seconds (not a probability).`;
@@ -194,7 +231,8 @@ export async function estimateEngagement(
     throw new Error("xAI API returned no content");
   }
 
-  const scores = JSON.parse(content) as PhoenixScores;
+  const rawScores = JSON.parse(content) as PhoenixScores;
+  const scores = clampScores(rawScores, input);
   const usage: TokenUsage = {
     inputTokens: data.usage?.prompt_tokens ?? 0,
     outputTokens: data.usage?.completion_tokens ?? 0,

@@ -153,44 +153,88 @@ export function selectExamples(tweets: CalibrationTweet[]): CalibrationTweet[] {
 }
 
 /**
+ * Build a few-shot example in the PhoenixScores output format.
+ * Observable rates are computed from impression data; unobservable
+ * fields are left for Grok to estimate using its knowledge of X.
+ */
+function buildFewShotExample(t: CalibrationTweet, index: number): string {
+  const truncated = t.text.length > 120 ? t.text.slice(0, 117) + "..." : t.text;
+  const mediaLabel = t.mediaType === "none" ? "text only" : t.mediaType;
+  const hasImage = t.mediaType === "image" || t.mediaType === "gif";
+  const hasVideo = t.mediaType === "video" || t.mediaType === "gif";
+
+  const lines: string[] = [];
+  lines.push(`Example ${index}:`);
+  lines.push(`Input:`);
+  lines.push(`  Tweet: "${truncated}"`);
+  lines.push(`  Media: ${mediaLabel} | Author followers: ${t.authorFollowers.toLocaleString()}`);
+  lines.push(
+    `  Engagement: ${t.likeCount.toLocaleString()} likes, ${t.replyCount.toLocaleString()} replies, ${t.retweetCount.toLocaleString()} retweets, ${t.quoteCount.toLocaleString()} quotes, ${t.bookmarkCount.toLocaleString()} bookmarks`
+  );
+
+  if (t.impressionCount && t.impressionCount > 0) {
+    const imp = t.impressionCount;
+    lines.push(`  Impressions: ${imp.toLocaleString()}`);
+    lines.push(`Output:`);
+    lines.push(`{`);
+    lines.push(`  "favoriteScore": ${(t.likeCount / imp).toFixed(6)},`);
+    lines.push(`  "replyScore": ${(t.replyCount / imp).toFixed(6)},`);
+    lines.push(`  "retweetScore": ${(t.retweetCount / imp).toFixed(6)},`);
+    lines.push(`  "photoExpandScore": ${hasImage ? "/* estimate */" : "0.0"},`);
+    lines.push(`  "clickScore": /* estimate */,`);
+    lines.push(`  "profileClickScore": /* estimate */,`);
+    lines.push(`  "vqvScore": ${hasVideo ? "/* estimate */" : "0.0"},`);
+    lines.push(
+      `  "shareScore": /* estimate — bookmarks (${t.bookmarkCount}) suggest save/share intent */,`
+    );
+    lines.push(`  "shareViaDmScore": /* estimate */,`);
+    lines.push(`  "shareViaCopyLinkScore": /* estimate */,`);
+    lines.push(`  "dwellScore": /* estimate */,`);
+    lines.push(`  "quoteScore": ${(t.quoteCount / imp).toFixed(6)},`);
+    lines.push(`  "quotedClickScore": ${t.quoteCount > 0 ? "/* estimate */" : "0.0"},`);
+    lines.push(`  "followAuthorScore": /* estimate */,`);
+    lines.push(`  "notInterestedScore": /* estimate */,`);
+    lines.push(`  "blockAuthorScore": /* estimate */,`);
+    lines.push(`  "muteAuthorScore": /* estimate */,`);
+    lines.push(`  "reportScore": /* estimate */,`);
+    lines.push(`  "dwellTime": /* estimate in seconds */`);
+    lines.push(`}`);
+  } else {
+    // No impression data — show counts only, no partial output
+    lines.push(`(No impression data — use engagement counts to infer rates)`);
+  }
+
+  return lines.join("\n");
+}
+
+/**
  * Build the calibration section for the Grok system prompt.
+ * Uses few-shot examples in the PhoenixScores output format
+ * so Grok sees concrete input→output mappings.
  */
 export function buildCalibrationPrompt(tweets: CalibrationTweet[]): string {
   const examples = selectExamples(tweets);
 
+  // Partition: tweets with impression data first (better few-shot), then the rest
+  const withImpressions = examples.filter((t) => t.impressionCount && t.impressionCount > 0);
+  const withoutImpressions = examples.filter((t) => !t.impressionCount || t.impressionCount <= 0);
+  const ordered = [...withImpressions, ...withoutImpressions];
+
   const lines: string[] = [
-    "Calibration — here are real tweets with their actual engagement metrics.",
-    "Use these to calibrate your probability estimates.\n",
+    "Few-shot calibration — real tweets with computed engagement rates in the exact output format.",
+    "Observable rates (favorite, reply, retweet, quote) are computed from real impression data.",
+    "For /* estimate */ fields, use your knowledge of X engagement patterns to fill in realistic values.\n",
   ];
 
-  for (let i = 0; i < examples.length; i++) {
-    const t = examples[i];
-    const truncated = t.text.length > 120 ? t.text.slice(0, 117) + "..." : t.text;
-    const mediaLabel = t.mediaType === "none" ? "text only" : t.mediaType;
-
-    lines.push(`Example ${i + 1}:`);
-    lines.push(`Tweet: "${truncated}"`);
-    lines.push(`Media: ${mediaLabel} | Author followers: ${t.authorFollowers.toLocaleString()}`);
-
-    const engagement = `Engagement: ${t.likeCount.toLocaleString()} likes, ${t.replyCount.toLocaleString()} replies, ${t.retweetCount.toLocaleString()} retweets, ${t.quoteCount.toLocaleString()} quotes, ${t.bookmarkCount.toLocaleString()} bookmarks`;
-    lines.push(engagement);
-
-    if (t.impressionCount && t.impressionCount > 0) {
-      const likeRate = (t.likeCount / t.impressionCount).toFixed(4);
-      const replyRate = (t.replyCount / t.impressionCount).toFixed(5);
-      const retweetRate = (t.retweetCount / t.impressionCount).toFixed(5);
-      lines.push(
-        `Impressions: ${t.impressionCount.toLocaleString()} → like rate: ${likeRate}, reply rate: ${replyRate}, retweet rate: ${retweetRate}`
-      );
-    }
+  for (let i = 0; i < ordered.length; i++) {
+    lines.push(buildFewShotExample(ordered[i], i + 1));
     lines.push("");
   }
 
   lines.push(
-    "Now estimate probabilities for the target tweet below.",
-    "For actions not directly observable above (click, profileClick, dwell, vqv, etc.),",
-    "use the engagement counts as anchoring signals — tweets with higher like/reply",
-    "counts generally have proportionally higher click and dwell rates."
+    "Now produce the full PhoenixScores JSON for the target tweet below.",
+    "Fill in ALL fields with numeric values — no comments, no placeholders.",
+    "Anchor your estimates on the real rates shown above."
   );
 
   return lines.join("\n");
