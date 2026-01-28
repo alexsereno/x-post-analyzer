@@ -1,0 +1,1218 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tweet Virality Analyzer</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect width='24' height='24' fill='%23000'/><path d='M13.52 10.45L20.14 3h-1.57l-5.74 6.47L8.33 3H3l6.94 9.8L3 20.28h1.57l6.07-6.85 4.85 6.85H21l-7.48-9.83zm-2.15 2.42l-.7-.98L5.2 4.16h2.41l4.52 6.28.7.97 5.86 8.14h-2.41l-4.91-6.68z' fill='white'/></svg>"
+    />
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        --bg: #0a0a0f;
+        --surface: #12121a;
+        --surface2: #1a1a26;
+        --border: #2a2a3a;
+        --text: #e0e0e8;
+        --text-dim: #888898;
+        --accent: #1d9bf0;
+        --accent-dim: #1a8cd8;
+        --green: #00c853;
+        --red: #ff4444;
+        --yellow: #ffab00;
+        --magenta: #c084fc;
+        --radius: 10px;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        padding: 40px 20px;
+      }
+
+      .container {
+        width: 100%;
+        max-width: 720px;
+      }
+
+      h1 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin-bottom: 4px;
+        color: var(--accent);
+      }
+
+      .subtitle {
+        font-size: 0.85rem;
+        color: var(--text-dim);
+        margin-bottom: 28px;
+      }
+
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 20px;
+        margin-bottom: 16px;
+      }
+
+      label {
+        display: block;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--text-dim);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 6px;
+      }
+
+      textarea,
+      input[type="text"] {
+        width: 100%;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        color: var(--text);
+        font-family: inherit;
+        font-size: 0.95rem;
+        padding: 12px;
+        outline: none;
+        transition: border-color 0.15s;
+      }
+
+      textarea {
+        min-height: 100px;
+        resize: vertical;
+      }
+
+      textarea:focus,
+      input[type="text"]:focus {
+        border-color: var(--accent);
+      }
+
+      .char-count {
+        text-align: right;
+        font-size: 0.75rem;
+        color: var(--text-dim);
+        margin-top: 4px;
+      }
+
+      .char-count.over {
+        color: var(--red);
+      }
+
+      /* Profile card */
+      .profile-card {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin-bottom: 20px;
+        padding: 14px 18px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        cursor: pointer;
+        text-decoration: none;
+        color: inherit;
+        transition: border-color 0.15s;
+      }
+
+      .profile-card:hover {
+        border-color: var(--accent);
+      }
+
+      .profile-card.hidden {
+        display: none;
+      }
+
+      .profile-avatar {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        object-fit: cover;
+        background: var(--surface2);
+      }
+
+      .profile-info {
+        flex: 1;
+      }
+
+      .profile-name {
+        font-weight: 700;
+        font-size: 0.95rem;
+      }
+
+      .profile-handle {
+        font-size: 0.82rem;
+        color: var(--text-dim);
+      }
+
+      .profile-followers {
+        font-size: 0.8rem;
+        color: var(--text-dim);
+        text-align: right;
+      }
+
+      .profile-followers strong {
+        color: var(--text);
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* Drop zone */
+      .drop-zone {
+        border: 2px dashed var(--border);
+        border-radius: 8px;
+        padding: 20px;
+        text-align: center;
+        color: var(--text-dim);
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition:
+          border-color 0.15s,
+          background 0.15s;
+        margin-top: 8px;
+      }
+
+      .drop-zone.drag-over {
+        border-color: var(--accent);
+        background: rgba(29, 155, 240, 0.05);
+      }
+
+      .drop-zone.has-media {
+        border-color: var(--green);
+        color: var(--green);
+      }
+
+      .drop-zone .clear-btn {
+        background: none;
+        border: none;
+        color: var(--text-dim);
+        cursor: pointer;
+        font-size: 0.8rem;
+        margin-left: 8px;
+        text-decoration: underline;
+      }
+
+      /* Options row */
+      .options-row {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        align-items: end;
+      }
+
+      .opt-group {
+        flex: 1;
+        min-width: 120px;
+      }
+
+      input[type="number"] {
+        width: 100%;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        color: var(--text);
+        font-family: inherit;
+        font-size: 0.9rem;
+        padding: 8px 12px;
+        outline: none;
+        transition: border-color 0.15s;
+      }
+
+      input[type="number"]:focus {
+        border-color: var(--accent);
+      }
+
+      /* Toggle */
+      .toggle-group {
+        display: flex;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      .toggle-group button {
+        flex: 1;
+        background: var(--surface2);
+        border: none;
+        color: var(--text-dim);
+        font-size: 0.8rem;
+        padding: 8px 14px;
+        cursor: pointer;
+        transition:
+          background 0.15s,
+          color 0.15s;
+      }
+
+      .toggle-group button.active {
+        background: var(--accent);
+        color: #fff;
+      }
+
+      /* Tweet type tabs */
+      .tweet-type-tabs {
+        display: flex;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+        margin-bottom: 12px;
+      }
+
+      .tweet-type-tabs button {
+        flex: 1;
+        background: var(--surface2);
+        border: none;
+        color: var(--text-dim);
+        font-size: 0.85rem;
+        padding: 10px 14px;
+        cursor: pointer;
+        transition:
+          background 0.15s,
+          color 0.15s;
+      }
+
+      .tweet-type-tabs button.active {
+        background: var(--accent);
+        color: #fff;
+      }
+
+      /* Parent tweet section */
+      .parent-section {
+        display: none;
+        margin-bottom: 14px;
+      }
+
+      .parent-section.visible {
+        display: block;
+      }
+
+      .parent-url-row {
+        display: flex;
+        gap: 8px;
+      }
+
+      .parent-url-row input[type="text"] {
+        flex: 1;
+      }
+
+      .fetch-btn {
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        color: var(--text);
+        font-family: inherit;
+        font-size: 0.85rem;
+        padding: 8px 16px;
+        cursor: pointer;
+        transition: border-color 0.15s;
+        white-space: nowrap;
+      }
+
+      .fetch-btn:hover {
+        border-color: var(--accent);
+      }
+      .fetch-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .parent-preview {
+        display: none;
+        margin-top: 10px;
+        padding: 12px;
+        background: var(--surface2);
+        border-radius: 8px;
+        border-left: 3px solid var(--accent);
+        font-size: 0.85rem;
+        line-height: 1.45;
+      }
+
+      .parent-preview.visible {
+        display: block;
+      }
+
+      .parent-preview-author {
+        font-size: 0.78rem;
+        color: var(--text-dim);
+        margin-bottom: 4px;
+      }
+
+      .parent-preview-author strong {
+        color: var(--text);
+      }
+
+      .parent-preview-media {
+        display: inline-block;
+        margin-top: 6px;
+        font-size: 0.75rem;
+        color: var(--accent);
+        background: rgba(29, 155, 240, 0.1);
+        padding: 2px 8px;
+        border-radius: 4px;
+      }
+
+      .parent-hint {
+        font-size: 0.75rem;
+        color: var(--text-dim);
+        margin-top: 4px;
+      }
+
+      /* Rank button */
+      .rank-btn {
+        width: 100%;
+        padding: 14px;
+        background: var(--accent);
+        border: none;
+        border-radius: var(--radius);
+        color: #fff;
+        font-family: inherit;
+        font-size: 1rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: background 0.15s;
+        margin-bottom: 16px;
+      }
+
+      .rank-btn:hover {
+        background: var(--accent-dim);
+      }
+      .rank-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      /* Spinner */
+      .spinner-wrap {
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        padding: 32px;
+      }
+
+      .spinner-wrap.visible {
+        display: flex;
+      }
+
+      .spinner {
+        width: 32px;
+        height: 32px;
+        border: 3px solid var(--border);
+        border-top-color: var(--accent);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .spinner-text {
+        color: var(--text-dim);
+        font-size: 0.85rem;
+      }
+
+      /* Results */
+      #results {
+        display: none;
+      }
+      #results.visible {
+        display: block;
+      }
+
+      .section-title {
+        font-size: 0.9rem;
+        font-weight: 700;
+        margin-bottom: 12px;
+        color: var(--accent);
+      }
+
+      /* Probability bars */
+      .prob-list {
+        list-style: none;
+      }
+
+      .prob-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+        font-size: 0.82rem;
+      }
+
+      .prob-label {
+        width: 130px;
+        flex-shrink: 0;
+        color: var(--text-dim);
+      }
+
+      .prob-bar-bg {
+        flex: 1;
+        height: 8px;
+        background: var(--surface2);
+        border-radius: 4px;
+        overflow: hidden;
+      }
+
+      .prob-bar-fill {
+        height: 100%;
+        border-radius: 4px;
+        background: var(--green);
+        transition: width 0.3s ease;
+      }
+
+      .prob-bar-fill.negative {
+        background: var(--red);
+      }
+
+      .prob-value {
+        width: 52px;
+        text-align: right;
+        flex-shrink: 0;
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* Score pipeline */
+      .pipeline-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 6px 0;
+        font-size: 0.85rem;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .pipeline-row:last-child {
+        border-bottom: none;
+      }
+      .pipeline-label {
+        color: var(--text-dim);
+      }
+      .pipeline-value {
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .final-score {
+        font-size: 1.3rem;
+        font-weight: 700;
+        text-align: center;
+        padding: 16px 0 4px;
+      }
+
+      /* Gemini analysis */
+      .rating-bar-wrap {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 16px;
+      }
+
+      .rating-bar-track {
+        flex: 1;
+        height: 10px;
+        background: var(--surface2);
+        border-radius: 5px;
+        overflow: hidden;
+      }
+
+      .rating-bar-fill {
+        height: 100%;
+        border-radius: 5px;
+        transition: width 0.3s ease;
+      }
+
+      .rating-number {
+        font-weight: 700;
+        font-size: 1rem;
+        min-width: 40px;
+      }
+
+      .assessment {
+        font-size: 0.9rem;
+        line-height: 1.5;
+        margin-bottom: 16px;
+        color: var(--text);
+      }
+
+      .list-section {
+        margin-bottom: 14px;
+      }
+
+      .list-section h4 {
+        font-size: 0.8rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 6px;
+      }
+
+      .list-section ul {
+        list-style: none;
+        padding-left: 0;
+      }
+
+      .list-section li {
+        font-size: 0.85rem;
+        padding: 4px 0;
+        padding-left: 16px;
+        position: relative;
+        line-height: 1.45;
+      }
+
+      .list-section li::before {
+        position: absolute;
+        left: 0;
+        font-weight: 700;
+      }
+
+      .strengths h4 {
+        color: var(--green);
+      }
+      .strengths li::before {
+        content: "+";
+        color: var(--green);
+      }
+
+      .weaknesses h4 {
+        color: var(--red);
+      }
+      .weaknesses li::before {
+        content: "\2212";
+        color: var(--red);
+      }
+
+      .suggestions h4 {
+        color: var(--yellow);
+      }
+      .suggestions li::before {
+        content: "*";
+        color: var(--yellow);
+      }
+
+      .revised-card {
+        background: var(--surface2);
+        border-radius: 8px;
+        padding: 14px;
+        font-size: 0.9rem;
+        line-height: 1.5;
+        border-left: 3px solid var(--magenta);
+      }
+
+      .revised-label {
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--magenta);
+        margin-bottom: 6px;
+      }
+
+      .error-msg {
+        background: rgba(255, 68, 68, 0.1);
+        border: 1px solid var(--red);
+        border-radius: 8px;
+        color: var(--red);
+        padding: 12px 16px;
+        font-size: 0.85rem;
+      }
+
+      .scores-only-note {
+        font-size: 0.8rem;
+        color: var(--text-dim);
+        text-align: center;
+        padding: 12px;
+        font-style: italic;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Tweet Virality Analyzer</h1>
+      <p class="subtitle">Score tweets using the 𝕏 recommendation algorithm's scoring pipeline</p>
+
+      <!-- Profile card -->
+      <a class="profile-card hidden" id="profile-card" href="#" target="_blank" rel="noopener">
+        <img class="profile-avatar" id="profile-avatar" src="" alt="" />
+        <div class="profile-info">
+          <div class="profile-name" id="profile-name"></div>
+          <div class="profile-handle" id="profile-handle"></div>
+        </div>
+        <div class="profile-followers" id="profile-followers"></div>
+      </a>
+
+      <!-- Tweet type -->
+      <div class="card">
+        <label>Tweet Type</label>
+        <div class="tweet-type-tabs">
+          <button id="tab-tweet" class="active" type="button">Tweet</button>
+          <button id="tab-reply" type="button">Reply</button>
+          <button id="tab-quote" type="button">Quote</button>
+        </div>
+
+        <!-- Parent tweet (reply/quote) -->
+        <div class="parent-section" id="parent-section">
+          <label id="parent-label">Replying to</label>
+          <div class="parent-url-row">
+            <input
+              type="text"
+              id="parent-url"
+              placeholder="Paste tweet URL (e.g. https://x.com/user/status/123)"
+            />
+            <button class="fetch-btn" id="fetch-btn" type="button">Fetch</button>
+          </div>
+          <div class="parent-preview" id="parent-preview"></div>
+          <div class="parent-hint">Paste a tweet URL to provide context for scoring</div>
+        </div>
+
+        <label for="tweet-text" style="margin-top: 12px">Your Tweet</label>
+        <textarea id="tweet-text" placeholder="What's happening?"></textarea>
+        <div class="char-count" id="char-count">0 / 280</div>
+
+        <label style="margin-top: 14px">Media</label>
+        <div class="drop-zone" id="drop-zone">
+          Drop an image, video, or GIF here to detect media type &mdash; or click to select
+          <input type="file" id="file-input" accept="image/*,video/*" hidden />
+        </div>
+      </div>
+
+      <!-- Options card -->
+      <div class="card">
+        <div class="options-row">
+          <div class="opt-group">
+            <label>Audience</label>
+            <div class="toggle-group">
+              <button id="btn-in-net" type="button">Followers</button>
+              <button id="btn-oon" class="active" type="button">Non-followers</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button class="rank-btn" id="rank-btn" type="button">Rank</button>
+
+      <div class="spinner-wrap" id="spinner">
+        <div class="spinner"></div>
+        <div class="spinner-text" id="spinner-text">Estimating engagement with Grok-3-mini...</div>
+      </div>
+
+      <div id="results"></div>
+    </div>
+
+    <script>
+      (function () {
+        const textarea = document.getElementById("tweet-text");
+        const charCount = document.getElementById("char-count");
+        const dropZone = document.getElementById("drop-zone");
+        const fileInput = document.getElementById("file-input");
+        const btnInNet = document.getElementById("btn-in-net");
+        const btnOon = document.getElementById("btn-oon");
+        const rankBtn = document.getElementById("rank-btn");
+        const spinner = document.getElementById("spinner");
+        const spinnerText = document.getElementById("spinner-text");
+        const resultsDiv = document.getElementById("results");
+
+        // Profile elements
+        const profileCard = document.getElementById("profile-card");
+        const profileAvatar = document.getElementById("profile-avatar");
+        const profileName = document.getElementById("profile-name");
+        const profileHandle = document.getElementById("profile-handle");
+        const profileFollowers = document.getElementById("profile-followers");
+
+        // Tweet type tabs
+        const tabTweet = document.getElementById("tab-tweet");
+        const tabReply = document.getElementById("tab-reply");
+        const tabQuote = document.getElementById("tab-quote");
+        const parentSection = document.getElementById("parent-section");
+        const parentLabel = document.getElementById("parent-label");
+        const parentUrlInput = document.getElementById("parent-url");
+        const fetchBtn = document.getElementById("fetch-btn");
+        const parentPreview = document.getElementById("parent-preview");
+
+        let tweetType = "tweet";
+        let detectedMedia = null;
+        let detectedVideoDurationMs = null;
+        let fetchedParentText = null;
+        let profileFollowerCount = null;
+
+        // --- Profile ---
+        async function loadProfile() {
+          try {
+            const resp = await fetch("/api/profile");
+            const data = await resp.json();
+            if (data.error) return;
+
+            profileAvatar.src = data.profileImageUrl || "";
+            profileName.textContent = data.name;
+            profileHandle.textContent = "@" + data.username;
+            profileFollowers.innerHTML =
+              "<strong>" + Number(data.followers).toLocaleString() + "</strong> followers";
+            profileCard.href = "https://x.com/" + data.username;
+            profileCard.classList.remove("hidden");
+            profileFollowerCount = data.followers;
+          } catch {
+            // Profile load is optional — fail silently
+          }
+        }
+
+        loadProfile();
+
+        // --- Tweet type ---
+        function setTweetType(type) {
+          tweetType = type;
+          tabTweet.classList.toggle("active", type === "tweet");
+          tabReply.classList.toggle("active", type === "reply");
+          tabQuote.classList.toggle("active", type === "quote");
+
+          if (type === "reply") {
+            parentSection.classList.add("visible");
+            parentLabel.textContent = "Replying to";
+            parentUrlInput.placeholder = "Paste tweet URL (e.g. https://x.com/user/status/123)";
+          } else if (type === "quote") {
+            parentSection.classList.add("visible");
+            parentLabel.textContent = "Quoting";
+            parentUrlInput.placeholder =
+              "Paste tweet URL to quote (e.g. https://x.com/user/status/123)";
+          } else {
+            parentSection.classList.remove("visible");
+          }
+        }
+
+        tabTweet.addEventListener("click", () => setTweetType("tweet"));
+        tabReply.addEventListener("click", () => setTweetType("reply"));
+        tabQuote.addEventListener("click", () => setTweetType("quote"));
+
+        // --- Fetch parent tweet ---
+        function isTweetUrl(text) {
+          return /(?:twitter\.com|x\.com)\/\w+\/status\/\d+/.test(text);
+        }
+
+        async function fetchParentTweet() {
+          const url = parentUrlInput.value.trim();
+          if (!url) return;
+
+          fetchBtn.disabled = true;
+          fetchBtn.textContent = "...";
+          parentPreview.classList.remove("visible");
+          parentPreview.innerHTML = "";
+          fetchedParentText = null;
+
+          try {
+            const resp = await fetch("/api/tweet?url=" + encodeURIComponent(url));
+            const data = await resp.json();
+
+            if (data.error) throw new Error(data.error);
+
+            fetchedParentText = data.text;
+
+            let html =
+              '<div class="parent-preview-author"><strong>' +
+              escHtml(data.authorName) +
+              "</strong> @" +
+              escHtml(data.authorUsername) +
+              "</div>" +
+              escHtml(data.text);
+
+            if (data.mediaType) {
+              html += '<div class="parent-preview-media">' + escHtml(data.mediaType) + "</div>";
+            }
+
+            parentPreview.innerHTML = html;
+            parentPreview.classList.add("visible");
+          } catch (err) {
+            parentPreview.innerHTML =
+              '<span style="color:var(--red)">' + escHtml(err.message) + "</span>";
+            parentPreview.classList.add("visible");
+          } finally {
+            fetchBtn.disabled = false;
+            fetchBtn.textContent = "Fetch";
+          }
+        }
+
+        fetchBtn.addEventListener("click", fetchParentTweet);
+
+        // Auto-fetch when pasting a tweet URL
+        parentUrlInput.addEventListener("paste", () => {
+          setTimeout(() => {
+            if (isTweetUrl(parentUrlInput.value)) fetchParentTweet();
+          }, 50);
+        });
+
+        // --- Character count ---
+        textarea.addEventListener("input", () => {
+          const len = textarea.value.length;
+          charCount.textContent = len + " / 280";
+          charCount.classList.toggle("over", len > 280);
+        });
+
+        // --- Network toggle ---
+        btnInNet.addEventListener("click", () => {
+          btnInNet.classList.add("active");
+          btnOon.classList.remove("active");
+        });
+        btnOon.addEventListener("click", () => {
+          btnOon.classList.add("active");
+          btnInNet.classList.remove("active");
+        });
+
+        // --- Drop zone ---
+        dropZone.addEventListener("click", () => fileInput.click());
+
+        dropZone.addEventListener("dragover", (e) => {
+          e.preventDefault();
+          dropZone.classList.add("drag-over");
+        });
+
+        dropZone.addEventListener("dragleave", () => {
+          dropZone.classList.remove("drag-over");
+        });
+
+        dropZone.addEventListener("drop", (e) => {
+          e.preventDefault();
+          dropZone.classList.remove("drag-over");
+          const file = e.dataTransfer.files[0];
+          if (file) handleFile(file);
+        });
+
+        fileInput.addEventListener("change", () => {
+          if (fileInput.files[0]) handleFile(fileInput.files[0]);
+        });
+
+        function handleFile(file) {
+          const mime = file.type;
+          detectedVideoDurationMs = null;
+
+          if (mime.startsWith("image/gif")) {
+            detectedMedia = "gif";
+          } else if (mime.startsWith("image/")) {
+            detectedMedia = "image";
+          } else if (mime.startsWith("video/")) {
+            detectedMedia = "video";
+            // Auto-detect video duration
+            const videoEl = document.createElement("video");
+            videoEl.preload = "metadata";
+            const blobUrl = URL.createObjectURL(file);
+            videoEl.onloadedmetadata = () => {
+              detectedVideoDurationMs = Math.round(videoEl.duration * 1000);
+              URL.revokeObjectURL(blobUrl);
+              updateMediaDisplay();
+            };
+            videoEl.src = blobUrl;
+          } else {
+            detectedMedia = null;
+            return;
+          }
+          updateMediaDisplay();
+        }
+
+        function updateMediaDisplay() {
+          dropZone.classList.add("has-media");
+          let label = "Media: <strong>" + detectedMedia + "</strong>";
+          if (detectedMedia === "video" && detectedVideoDurationMs != null) {
+            var secs = (detectedVideoDurationMs / 1000).toFixed(1);
+            label += " <span style='color:var(--text-dim);font-size:0.8rem'>(" + secs + "s)</span>";
+          }
+          label += ' <button class="clear-btn" type="button">clear</button>';
+          dropZone.innerHTML = label;
+          dropZone.querySelector(".clear-btn").addEventListener("click", (e) => {
+            e.stopPropagation();
+            clearMedia();
+          });
+        }
+
+        function clearMedia() {
+          detectedMedia = null;
+          detectedVideoDurationMs = null;
+          fileInput.value = "";
+          dropZone.classList.remove("has-media");
+          dropZone.innerHTML =
+            "Drop an image, video, or GIF here to detect media type &mdash; or click to select" +
+            '<input type="file" id="file-input" accept="image/*,video/*" hidden>';
+          document.getElementById("file-input").addEventListener("change", () => {
+            if (document.getElementById("file-input").files[0])
+              handleFile(document.getElementById("file-input").files[0]);
+          });
+        }
+
+        // Link detection
+        function hasUrl(text) {
+          return /https?:\/\/\S+/i.test(text);
+        }
+
+        // --- UI locking ---
+        function lockUI() {
+          rankBtn.disabled = true;
+          textarea.disabled = true;
+          parentUrlInput.disabled = true;
+          fetchBtn.disabled = true;
+          btnInNet.disabled = true;
+          btnOon.disabled = true;
+          tabTweet.disabled = true;
+          tabReply.disabled = true;
+          tabQuote.disabled = true;
+        }
+
+        function unlockUI() {
+          rankBtn.disabled = false;
+          textarea.disabled = false;
+          parentUrlInput.disabled = false;
+          fetchBtn.disabled = false;
+          btnInNet.disabled = false;
+          btnOon.disabled = false;
+          tabTweet.disabled = false;
+          tabReply.disabled = false;
+          tabQuote.disabled = false;
+        }
+
+        // --- Rank ---
+        rankBtn.addEventListener("click", async () => {
+          const text = textarea.value.trim();
+          if (!text) {
+            textarea.focus();
+            return;
+          }
+
+          let media = detectedMedia;
+          if (!media && hasUrl(text)) media = "link";
+
+          // Block if reply/quote without fetched parent
+          if (tweetType !== "tweet" && !fetchedParentText) {
+            parentUrlInput.focus();
+            return;
+          }
+
+          const followers = profileFollowerCount || undefined;
+          const videoDurationMs = detectedVideoDurationMs || undefined;
+          const inNetwork = btnInNet.classList.contains("active");
+
+          const payload = {
+            text,
+            media: media || undefined,
+            followers,
+            isReply: tweetType === "reply",
+            isQuote: tweetType === "quote",
+            parentText: fetchedParentText || undefined,
+            videoDurationMs,
+            inNetwork,
+          };
+
+          lockUI();
+          resultsDiv.classList.remove("visible");
+          resultsDiv.innerHTML = "";
+          spinner.classList.add("visible");
+          spinnerText.textContent = "Estimating engagement probabilities...";
+
+          try {
+            // Phase 1: Score (Grok + pipeline)
+            const scoreResp = await fetch("/api/score", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+
+            const scored = await scoreResp.json();
+            if (!scoreResp.ok) throw new Error(scored.error || "Scoring failed");
+
+            // Show scores immediately
+            renderScores(scored);
+            resultsDiv.classList.add("visible");
+
+            // Phase 2: Gemini analysis
+            spinnerText.textContent = "Analyzing with Gemini...";
+            const geminiResp = await fetch("/api/gemini", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ ...payload, scored }),
+            });
+
+            const analysis = await geminiResp.json();
+            if (geminiResp.ok && !analysis.error) {
+              appendAnalysis(analysis);
+            } else {
+              appendAnalysisError(analysis.error || "Gemini analysis failed");
+            }
+
+            spinner.classList.remove("visible");
+          } catch (err) {
+            spinner.classList.remove("visible");
+            resultsDiv.innerHTML = '<div class="error-msg">' + escHtml(err.message) + "</div>";
+            resultsDiv.classList.add("visible");
+          } finally {
+            unlockUI();
+          }
+        });
+
+        function escHtml(s) {
+          return s
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
+        }
+
+        function renderScores(scored) {
+          let html = "";
+
+          // Engagement probabilities
+          html += '<div class="card">';
+          html += '<div class="section-title">Engagement Probabilities</div>';
+          html += '<ul class="prob-list">';
+
+          const positiveActions = scored.weightBreakdown.filter((e) => e.weight >= 0);
+          const negativeActions = scored.weightBreakdown.filter((e) => e.weight < 0);
+
+          for (const e of positiveActions) {
+            const pct = Math.min(e.probability * 100, 100);
+            html +=
+              '<li class="prob-item">' +
+              '<span class="prob-label">' +
+              escHtml(e.action) +
+              "</span>" +
+              '<div class="prob-bar-bg"><div class="prob-bar-fill" style="width:' +
+              pct * 3.33 +
+              '%"></div></div>' +
+              '<span class="prob-value">' +
+              e.probability.toFixed(4) +
+              "</span>" +
+              "</li>";
+          }
+
+          html += "</ul>";
+
+          if (negativeActions.length) {
+            html +=
+              '<div style="margin-top:12px;font-size:0.8rem;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">Negative Signals</div>';
+            html += '<ul class="prob-list">';
+            for (const e of negativeActions) {
+              const pct = Math.min(e.probability * 100, 100);
+              html +=
+                '<li class="prob-item">' +
+                '<span class="prob-label">' +
+                escHtml(e.action) +
+                "</span>" +
+                '<div class="prob-bar-bg"><div class="prob-bar-fill negative" style="width:' +
+                pct * 3.33 +
+                '%"></div></div>' +
+                '<span class="prob-value">' +
+                e.probability.toFixed(4) +
+                "</span>" +
+                "</li>";
+            }
+            html += "</ul>";
+          }
+
+          html += "</div>";
+
+          // Score pipeline
+          html += '<div class="card">';
+          html += '<div class="section-title">Score Pipeline</div>';
+          html += pipelineRow("Raw weighted score", scored.rawWeightedScore);
+          html += pipelineRow("After offset", scored.offsetScore);
+          html += pipelineRow(
+            "Author diversity (\u00d7" + scored.diversityMultiplier.toFixed(2) + ")",
+            scored.diversityAdjustedScore
+          );
+          html += pipelineRow(
+            "OON adjustment (\u00d7" + scored.oonMultiplier.toFixed(2) + ")",
+            scored.finalScore
+          );
+
+          const sc =
+            scored.finalScore >= 3
+              ? "var(--green)"
+              : scored.finalScore >= 1
+                ? "var(--yellow)"
+                : "var(--red)";
+          html +=
+            '<div class="final-score" style="color:' +
+            sc +
+            '">' +
+            scored.finalScore.toFixed(4) +
+            "</div>";
+          html += "</div>";
+
+          resultsDiv.innerHTML = html;
+          resultsDiv.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+
+        function appendAnalysis(analysis) {
+          let html = '<div class="card">';
+          html += '<div class="section-title">Gemini Analysis</div>';
+
+          const ratingPct = analysis.viralityRating * 10;
+          const ratingColor =
+            analysis.viralityRating >= 7
+              ? "var(--green)"
+              : analysis.viralityRating >= 4
+                ? "var(--yellow)"
+                : "var(--red)";
+          html +=
+            '<div class="rating-bar-wrap">' +
+            '<div class="rating-bar-track"><div class="rating-bar-fill" style="width:' +
+            ratingPct +
+            "%;background:" +
+            ratingColor +
+            '"></div></div>' +
+            '<span class="rating-number" style="color:' +
+            ratingColor +
+            '">' +
+            analysis.viralityRating +
+            "/10</span>" +
+            "</div>";
+
+          html += '<p class="assessment">' + escHtml(analysis.assessment) + "</p>";
+
+          html += '<div class="list-section strengths"><h4>Strengths</h4><ul>';
+          for (const s of analysis.strengths) html += "<li>" + escHtml(s) + "</li>";
+          html += "</ul></div>";
+
+          html += '<div class="list-section weaknesses"><h4>Weaknesses</h4><ul>';
+          for (const w of analysis.weaknesses) html += "<li>" + escHtml(w) + "</li>";
+          html += "</ul></div>";
+
+          html += '<div class="list-section suggestions"><h4>Suggestions</h4><ul>';
+          for (const s of analysis.suggestions) html += "<li>" + escHtml(s) + "</li>";
+          html += "</ul></div>";
+
+          html += '<div class="revised-label">Revised Tweet</div>';
+          html += '<div class="revised-card">' + escHtml(analysis.revisedTweet) + "</div>";
+
+          html += "</div>";
+
+          resultsDiv.insertAdjacentHTML("beforeend", html);
+        }
+
+        function appendAnalysisError(message) {
+          resultsDiv.insertAdjacentHTML(
+            "beforeend",
+            '<div class="scores-only-note" style="color:var(--red)">' + escHtml(message) + "</div>"
+          );
+        }
+
+        function pipelineRow(label, value) {
+          return (
+            '<div class="pipeline-row"><span class="pipeline-label">' +
+            escHtml(label) +
+            '</span><span class="pipeline-value">' +
+            value.toFixed(4) +
+            "</span></div>"
+          );
+        }
+      })();
+    </script>
+  </body>
+</html>

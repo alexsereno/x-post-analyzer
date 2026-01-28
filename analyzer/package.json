@@ -1,0 +1,29 @@
+{
+  "name": "tweet-virality-analyzer",
+  "version": "1.0.0",
+  "description": "Score tweet text using the X recommendation algorithm's scoring pipeline",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "dev": "tsx src/server.ts",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/",
+    "format": "prettier --write src/",
+    "format:check": "prettier --check src/",
+    "check": "npm run typecheck && npm run lint && npm run format:check"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "@types/node": "^22.0.0",
+    "eslint": "^9.39.2",
+    "prettier": "^3.8.1",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.54.0"
+  },
+  "dependencies": {
+    "@xdevplatform/xdk": "^0.4.0",
+    "dotenv": "^17.2.3"
+  }
+}
