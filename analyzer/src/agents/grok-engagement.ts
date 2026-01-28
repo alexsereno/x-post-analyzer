@@ -6,13 +6,12 @@
  * reliable JSON response matching PhoenixScores.
  */
 
-import type { PhoenixScores, TweetInput } from "../types.js";
+import type { PhoenixScores, TweetInput, TokenUsage } from "../types.js";
 import { XAI_API_URL } from "../config.js";
+import type { CalibrationTweet } from "../calibration.js";
+import { buildCalibrationPrompt } from "../calibration.js";
 
-const SYSTEM_PROMPT = `You are an engagement prediction model for the X (Twitter) recommendation algorithm.
-Given a tweet, estimate the probability that an average viewer will take each of the 19 engagement actions.
-
-Calibration guidance — typical ranges for an average tweet:
+const STATIC_CALIBRATION = `Calibration guidance — typical ranges for an average tweet:
 - favoriteScore: 0.01–0.15 (likes are the most common action)
 - replyScore: 0.001–0.05 (replies are less common)
 - retweetScore: 0.005–0.08 (retweets are moderately common)
@@ -31,9 +30,35 @@ Calibration guidance — typical ranges for an average tweet:
 - blockAuthorScore: 0.0001–0.005 (blocking author)
 - muteAuthorScore: 0.0001–0.005 (muting author)
 - reportScore: 0.00005–0.002 (reporting the tweet)
-- dwellTime: 2.0–30.0 (expected dwell time in seconds, NOT a probability)
+- dwellTime: 2.0–30.0 (expected dwell time in seconds, NOT a probability)`;
 
-Factors to consider:
+const UNOBSERVABLE_GUIDANCE = `For actions not directly available in the examples above, use these relative guidelines:
+- clickScore: typically 2–5× the like rate (clicking to expand/read)
+- profileClickScore: roughly 0.3–0.5× the like rate
+- photoExpandScore: ~0.5–1× the like rate when images are present, else ~0
+- vqvScore: similar to photoExpand but for video, else ~0
+- shareScore: ~0.05–0.2× the like rate
+- shareViaDmScore: ~0.03–0.1× the like rate
+- shareViaCopyLinkScore: ~0.03–0.1× the like rate
+- dwellScore: 3–10× the like rate (most viewers pause to read)
+- quotedClickScore: similar to like rate if quote, else ~0
+- followAuthorScore: ~0.01–0.1× the like rate
+- notInterestedScore: typically <0.5% of impressions
+- blockAuthorScore: typically <0.05% of impressions
+- muteAuthorScore: typically <0.05% of impressions
+- reportScore: typically <0.01% of impressions
+- dwellTime: 2.0–30.0 seconds (NOT a probability)`;
+
+function buildSystemPrompt(calibration: CalibrationTweet[] | null): string {
+  const intro = `You are an engagement prediction model for the X (Twitter) recommendation algorithm.
+Given a tweet, estimate the probability that an average viewer will take each of the 19 engagement actions.`;
+
+  const calibrationSection =
+    calibration && calibration.length > 0
+      ? buildCalibrationPrompt(calibration) + "\n\n" + UNOBSERVABLE_GUIDANCE
+      : STATIC_CALIBRATION;
+
+  const factors = `Factors to consider:
 - Text length, clarity, and emotional valence
 - Media type (images boost photoExpand, videos boost vqv)
 - Call-to-action presence (questions boost reply, "RT if" boosts retweet)
@@ -43,6 +68,9 @@ Factors to consider:
 
 Keep estimates realistic. Most probabilities should be well under 0.10.
 dwellTime is in seconds (not a probability).`;
+
+  return `${intro}\n\n${calibrationSection}\n\n${factors}`;
+}
 
 function buildUserPrompt(input: TweetInput): string {
   const parts = [`Tweet text: "${input.text}"`];
@@ -114,11 +142,19 @@ const JSON_SCHEMA = {
   },
 };
 
+export interface GrokEngagementResult {
+  scores: PhoenixScores;
+  usage: TokenUsage;
+}
+
 export async function estimateEngagement(
   input: TweetInput,
   apiKey: string,
-  model: string
-): Promise<PhoenixScores> {
+  model: string,
+  calibration?: CalibrationTweet[] | null
+): Promise<GrokEngagementResult> {
+  const systemPrompt = buildSystemPrompt(calibration ?? null);
+
   const response = await fetch(XAI_API_URL, {
     method: "POST",
     headers: {
@@ -128,7 +164,7 @@ export async function estimateEngagement(
     body: JSON.stringify({
       model,
       messages: [
-        { role: "system", content: SYSTEM_PROMPT },
+        { role: "system", content: systemPrompt },
         { role: "user", content: buildUserPrompt(input) },
       ],
       response_format: {
@@ -146,6 +182,11 @@ export async function estimateEngagement(
 
   const data = (await response.json()) as {
     choices: Array<{ message: { content: string } }>;
+    usage?: {
+      prompt_tokens: number;
+      completion_tokens: number;
+      prompt_tokens_details?: { cached_tokens?: number };
+    };
   };
 
   const content = data.choices[0]?.message?.content;
@@ -153,5 +194,13 @@ export async function estimateEngagement(
     throw new Error("xAI API returned no content");
   }
 
-  return JSON.parse(content) as PhoenixScores;
+  const scores = JSON.parse(content) as PhoenixScores;
+  const usage: TokenUsage = {
+    inputTokens: data.usage?.prompt_tokens ?? 0,
+    outputTokens: data.usage?.completion_tokens ?? 0,
+    cachedTokens: data.usage?.prompt_tokens_details?.cached_tokens ?? 0,
+    model,
+  };
+
+  return { scores, usage };
 }

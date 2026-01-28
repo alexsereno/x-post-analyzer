@@ -15,6 +15,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.0.0",
     "eslint": "^9.39.2",
     "prettier": "^3.8.1",
@@ -24,6 +25,7 @@
   },
   "dependencies": {
     "@xdevplatform/xdk": "^0.4.0",
+    "better-sqlite3": "^12.6.2",
     "dotenv": "^17.2.3"
   }
 }

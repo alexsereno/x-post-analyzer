@@ -2,7 +2,7 @@
  * Terminal output formatting with ANSI colours.
  */
 
-import type { ScoredResult, GeminiAnalysis, TweetInput } from "./types.js";
+import type { ScoredResult, GeminiAnalysis, TweetInput, RunCost } from "./types.js";
 
 const RESET = "\x1b[0m";
 const BOLD = "\x1b[1m";
@@ -126,6 +126,52 @@ export function displayAnalysis(analysis: GeminiAnalysis): void {
   console.log(`  ${BOLD}${MAGENTA}Revised Tweet${RESET}`);
   console.log(`    "${analysis.revisedTweet}"`);
   console.log("");
+}
+
+export function displayCost(cost: RunCost): void {
+  console.log("");
+  console.log(`${DIM}${"─".repeat(60)}${RESET}`);
+  console.log(`${BOLD}${CYAN}Run Cost${RESET}`);
+  console.log("");
+
+  if (cost.grok) {
+    const { usage, cost: c } = cost.grok;
+    const cachedInfo =
+      usage.cachedTokens > 0 ? ` (${usage.cachedTokens.toLocaleString()} cached)` : "";
+    console.log(
+      `  ${WHITE}Grok (${usage.model})${RESET}  ${DIM}${usage.inputTokens.toLocaleString()} in${cachedInfo} / ${usage.outputTokens.toLocaleString()} out${RESET}  $${c.toFixed(6)}`
+    );
+  }
+
+  if (cost.gemini) {
+    const { usage, cost: c } = cost.gemini;
+    console.log(
+      `  ${WHITE}Gemini (${usage.model})${RESET}  ${DIM}${usage.inputTokens.toLocaleString()} in / ${usage.outputTokens.toLocaleString()} out${RESET}  $${c.toFixed(6)}`
+    );
+  }
+
+  if (cost.xApi) {
+    const { reads, writes, endpoints } = cost.xApi;
+    const endpointSummary = summarizeEndpoints(endpoints);
+    const parts: string[] = [];
+    if (reads > 0) parts.push(`${reads} read${reads !== 1 ? "s" : ""}`);
+    if (writes > 0) parts.push(`${writes} write${writes !== 1 ? "s" : ""}`);
+    console.log(
+      `  ${WHITE}X API${RESET}  ${DIM}${parts.join(", ")} (${endpointSummary})${RESET}  ${DIM}free tier${RESET}`
+    );
+  }
+
+  console.log("");
+  console.log(`  ${BOLD}Total: $${cost.totalCost.toFixed(6)}${RESET}`);
+  console.log("");
+}
+
+function summarizeEndpoints(endpoints: string[]): string {
+  const counts = new Map<string, number>();
+  for (const ep of endpoints) {
+    counts.set(ep, (counts.get(ep) ?? 0) + 1);
+  }
+  return [...counts.entries()].map(([ep, n]) => (n > 1 ? `${ep} x${n}` : ep)).join(", ");
 }
 
 export function displayError(message: string): void {

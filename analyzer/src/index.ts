@@ -13,9 +13,17 @@ import "dotenv/config";
  */
 
 import { parseArgs } from "node:util";
-import type { TweetInput } from "./types.js";
-import { computeScores, analyzeScores } from "./pipeline.js";
-import { displayHeader, displayScores, displayAnalysis, displayError } from "./display.js";
+import type { TweetInput, TokenUsage } from "./types.js";
+import { computeScores, analyzeScores, calculateCost } from "./pipeline.js";
+import { loadCalibration } from "./calibration.js";
+import { createXClient, resetXApiUsage } from "./x-client.js";
+import {
+  displayHeader,
+  displayScores,
+  displayAnalysis,
+  displayCost,
+  displayError,
+} from "./display.js";
 
 function parseCliArgs(): {
   input: TweetInput;
@@ -119,15 +127,29 @@ async function run(): Promise<void> {
 
   displayHeader(input);
 
+  // Reset X API usage counter for this run
+  resetXApiUsage();
+
+  // Load calibration data (uses cache or fetches from X API)
+  const xBearerToken = process.env.X_BEARER_TOKEN;
+  const xClient = xBearerToken ? createXClient(xBearerToken) : null;
+  const calibration = await loadCalibration(xClient);
+
   console.log(`\x1b[2mEstimating engagement probabilities with ${grokModel}...\x1b[0m`);
-  const scored = await computeScores(input, xaiKey, grokModel);
+  const { scored, grokUsage } = await computeScores(input, xaiKey, grokModel, calibration);
   displayScores(scored);
+
+  let geminiUsage: TokenUsage | undefined;
 
   if (!scoresOnly && geminiKey && geminiModel) {
     console.log(`\x1b[2mAnalysing with ${geminiModel}...\x1b[0m`);
-    const analysis = await analyzeScores(input, scored, geminiKey, geminiModel);
-    displayAnalysis(analysis);
+    const result = await analyzeScores(input, scored, geminiKey, geminiModel);
+    displayAnalysis(result.analysis);
+    geminiUsage = result.geminiUsage;
   }
+
+  const cost = calculateCost(grokUsage, geminiUsage);
+  displayCost(cost);
 }
 
 run().catch((err: Error) => {

@@ -3,7 +3,7 @@
  * strengths/weaknesses, and suggestions based on the scored result.
  */
 
-import type { ScoredResult, GeminiAnalysis, TweetInput } from "../types.js";
+import type { ScoredResult, GeminiAnalysis, TweetInput, TokenUsage } from "../types.js";
 import { GEMINI_API_URL } from "../config.js";
 
 function buildPrompt(input: TweetInput, result: ScoredResult): string {
@@ -49,12 +49,17 @@ Provide your analysis as JSON with these fields:
 - revisedTweet: a revised version of the tweet incorporating your suggestions`;
 }
 
+export interface GeminiAnalysisResult {
+  analysis: GeminiAnalysis;
+  usage: TokenUsage;
+}
+
 export async function analyzeWithGemini(
   input: TweetInput,
   result: ScoredResult,
   apiKey: string,
   model: string
-): Promise<GeminiAnalysis> {
+): Promise<GeminiAnalysisResult> {
   const url = `${GEMINI_API_URL}/${model}:generateContent?key=${apiKey}`;
 
   const response = await fetch(url, {
@@ -95,6 +100,7 @@ export async function analyzeWithGemini(
 
   const data = (await response.json()) as {
     candidates: Array<{ content: { parts: Array<{ text: string }> } }>;
+    usageMetadata?: { promptTokenCount: number; candidatesTokenCount: number };
   };
 
   const text = data.candidates[0]?.content?.parts?.[0]?.text;
@@ -102,5 +108,13 @@ export async function analyzeWithGemini(
     throw new Error("Gemini API returned no content");
   }
 
-  return JSON.parse(text) as GeminiAnalysis;
+  const analysis = JSON.parse(text) as GeminiAnalysis;
+  const usage: TokenUsage = {
+    inputTokens: data.usageMetadata?.promptTokenCount ?? 0,
+    outputTokens: data.usageMetadata?.candidatesTokenCount ?? 0,
+    cachedTokens: 0,
+    model,
+  };
+
+  return { analysis, usage };
 }

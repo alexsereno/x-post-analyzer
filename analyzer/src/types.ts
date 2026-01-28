@@ -52,6 +52,29 @@ export interface WeightBreakdownEntry {
   contribution: number;
 }
 
+/** Token usage from an LLM API call */
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cachedTokens: number;
+  model: string;
+}
+
+/** X API usage tracking (free tier: 100 reads/mo, 500 posts/mo) */
+export interface XApiUsage {
+  reads: number;
+  writes: number;
+  endpoints: string[];
+}
+
+/** Cost breakdown for a single run */
+export interface RunCost {
+  grok?: { usage: TokenUsage; cost: number };
+  gemini?: { usage: TokenUsage; cost: number };
+  xApi?: XApiUsage;
+  totalCost: number;
+}
+
 /** Gemini analysis output */
 export interface GeminiAnalysis {
   assessment: string;

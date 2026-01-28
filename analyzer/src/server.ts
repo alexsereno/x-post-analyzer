@@ -5,8 +5,28 @@ import { readFile } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { TweetInput, ScoredResult } from "./types.js";
-import { computeScores, analyzeScores } from "./pipeline.js";
-import { createXClient, fetchUserProfile, fetchTweet, extractTweetId } from "./x-client.js";
+import type { CalibrationTweet } from "./calibration.js";
+import { loadCalibration } from "./calibration.js";
+import { computeScores, analyzeScores, calculateCost } from "./pipeline.js";
+import {
+  createXClient,
+  fetchUserProfile,
+  fetchTweet,
+  extractTweetId,
+  postTweet,
+  resetXApiUsage,
+  getXApiUsage,
+} from "./x-client.js";
+import {
+  initDb,
+  saveRun,
+  updateRunAnalysis,
+  updateRunPosted,
+  listRuns,
+  getRun,
+  incrementXApiUsage,
+  getMonthlyUsage,
+} from "./db.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = 3577;
@@ -21,6 +41,16 @@ if (!grokModel || !geminiModel) {
   console.error("GROK_MODEL and GEMINI_MODEL environment variables are required");
   process.exit(1);
 }
+
+// Initialize database
+initDb();
+
+let calibrationData: CalibrationTweet[] | null = null;
+
+// Load calibration data at startup (non-blocking)
+loadCalibration(xClient).then((data) => {
+  calibrationData = data;
+});
 
 async function readBody(req: IncomingMessage): Promise<string> {
   let body = "";
@@ -41,6 +71,10 @@ function parseTweetInput(payload: Record<string, unknown>): TweetInput {
     videoDurationMs: payload.videoDurationMs as number | undefined,
     inNetwork: (payload.inNetwork as boolean) ?? false,
   };
+}
+
+function generateRunId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 }
 
 const server = createServer(async (req, res) => {
@@ -107,6 +141,60 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  // History list
+  if (req.method === "GET" && url.pathname === "/api/history") {
+    try {
+      const runs = listRuns();
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(runs));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: message }));
+    }
+    return;
+  }
+
+  // History detail
+  if (req.method === "GET" && url.pathname.startsWith("/api/history/")) {
+    const runId = url.pathname.slice("/api/history/".length);
+    if (!runId) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Missing run ID" }));
+      return;
+    }
+
+    try {
+      const run = getRun(runId);
+      if (!run) {
+        res.writeHead(404, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Run not found" }));
+        return;
+      }
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(run));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: message }));
+    }
+    return;
+  }
+
+  // Monthly usage
+  if (req.method === "GET" && url.pathname === "/api/usage") {
+    try {
+      const usage = getMonthlyUsage();
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ...usage, readLimit: 100, writeLimit: 500 }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: message }));
+    }
+    return;
+  }
+
   // Stage 1–4: Score tweet (Grok + scoring pipeline)
   if (req.method === "POST" && url.pathname === "/api/score") {
     const xaiKey = process.env.XAI_API_KEY;
@@ -132,10 +220,43 @@ const server = createServer(async (req, res) => {
     }
 
     try {
+      resetXApiUsage();
       const input = parseTweetInput(payload);
-      const scored = await computeScores(input, xaiKey, grokModel);
+      const { scored, grokUsage } = await computeScores(input, xaiKey, grokModel, calibrationData);
+      const cost = calculateCost(grokUsage);
+
+      // Persist to database
+      const runId = generateRunId();
+      const tweetType = input.isReply ? "reply" : input.isQuote ? "quote" : "tweet";
+      saveRun({
+        id: runId,
+        tweetText: input.text,
+        tweetType,
+        mediaType: input.media ?? null,
+        videoDurationMs: input.videoDurationMs ?? null,
+        parentUrl: (payload.parentUrl as string) ?? null,
+        parentText: input.parentText ?? null,
+        parentAuthorName: (payload.parentAuthorName as string) ?? null,
+        parentAuthorUsername: (payload.parentAuthorUsername as string) ?? null,
+        parentTweetId: (payload.parentTweetId as string) ?? null,
+        authorName: (payload.authorName as string) ?? null,
+        authorHandle: (payload.authorHandle as string) ?? null,
+        authorAvatar: (payload.authorAvatar as string) ?? null,
+        followerCount: input.followers ?? 0,
+        inNetwork: input.inNetwork ?? false,
+        scoredResult: scored,
+        costData: { scoreCost: cost, geminiCost: null },
+        finalScore: scored.finalScore,
+      });
+
+      // Track X API usage from this request
+      const xUsage = getXApiUsage();
+      if (xUsage.reads > 0 || xUsage.writes > 0) {
+        incrementXApiUsage(xUsage.reads, xUsage.writes);
+      }
+
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify(scored));
+      res.end(JSON.stringify({ ...scored, usage: { grok: grokUsage }, cost, runId }));
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error";
       res.writeHead(500, { "Content-Type": "application/json" });
@@ -171,9 +292,71 @@ const server = createServer(async (req, res) => {
     try {
       const input = parseTweetInput(payload);
       const scored = payload.scored as ScoredResult;
-      const analysis = await analyzeScores(input, scored, geminiKey, geminiModel);
+      const { analysis, geminiUsage } = await analyzeScores(input, scored, geminiKey, geminiModel);
+      const cost = calculateCost(undefined, geminiUsage);
+
+      // Persist Gemini analysis to database
+      const runId = payload.runId as string | undefined;
+      if (runId) {
+        const existingRun = getRun(runId);
+        const existingCost = (existingRun?.costData as Record<string, unknown>) ?? {};
+        updateRunAnalysis(runId, analysis, {
+          ...existingCost,
+          geminiCost: cost,
+        });
+      }
+
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify(analysis));
+      res.end(JSON.stringify({ ...analysis, usage: { gemini: geminiUsage }, cost }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: message }));
+    }
+    return;
+  }
+
+  // Post tweet to X
+  if (req.method === "POST" && url.pathname === "/api/post") {
+    if (!xClient) {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "X_BEARER_TOKEN not configured" }));
+      return;
+    }
+
+    let payload: Record<string, unknown>;
+    try {
+      payload = JSON.parse(await readBody(req));
+    } catch {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Invalid JSON" }));
+      return;
+    }
+
+    if (!payload.text || typeof payload.text !== "string") {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "text field is required" }));
+      return;
+    }
+
+    try {
+      const result = await postTweet(xClient, {
+        text: payload.text as string,
+        replyToTweetId: payload.replyToTweetId as string | undefined,
+        quoteTweetId: payload.quoteTweetId as string | undefined,
+      });
+
+      // Persist posted tweet ID to database
+      const runId = payload.runId as string | undefined;
+      if (runId) {
+        updateRunPosted(runId, result.id);
+      }
+
+      // Track the write
+      incrementXApiUsage(0, 1);
+
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(result));
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error";
       res.writeHead(500, { "Content-Type": "application/json" });
@@ -193,5 +376,8 @@ server.listen(PORT, () => {
   console.log(`  Gemini model: ${geminiModel}`);
   if (!xClient || !xUsername) {
     console.log("  Note: X_BEARER_TOKEN / X_USERNAME not set — profile and tweet lookup disabled");
+  }
+  if (!xBearerToken) {
+    console.log("  Note: Calibration disabled (no X_BEARER_TOKEN)");
   }
 });

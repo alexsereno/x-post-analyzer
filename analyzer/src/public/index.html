@@ -38,14 +38,206 @@
         background: var(--bg);
         color: var(--text);
         min-height: 100vh;
+        margin: 0;
+      }
+
+      .app-layout {
         display: flex;
-        justify-content: center;
-        padding: 40px 20px;
+        min-height: 100vh;
       }
 
       .container {
         width: 100%;
         max-width: 720px;
+        margin: 0 auto;
+        padding: 40px 20px;
+      }
+
+      /* Sidebar */
+      .sidebar {
+        width: 340px;
+        min-width: 340px;
+        height: 100vh;
+        position: sticky;
+        top: 0;
+        border-right: 1px solid var(--border);
+        background: var(--surface);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .sidebar-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 20px 16px 12px;
+        border-bottom: 1px solid var(--border);
+        flex-shrink: 0;
+      }
+
+      .sidebar-header h2 {
+        font-size: 1.1rem;
+        font-weight: 700;
+      }
+
+      .sidebar-usage {
+        font-size: 0.72rem;
+        color: var(--text-dim);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .sidebar-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px 0;
+      }
+
+      .sidebar-empty {
+        padding: 32px 16px;
+        text-align: center;
+        color: var(--text-dim);
+        font-size: 0.82rem;
+        line-height: 1.5;
+      }
+
+      /* History card */
+      .history-card {
+        padding: 12px 16px;
+        cursor: pointer;
+        border-left: 3px solid transparent;
+        transition:
+          background 0.15s,
+          border-color 0.15s;
+      }
+
+      .history-card:hover {
+        background: var(--surface2);
+      }
+
+      .history-card.active {
+        border-left-color: var(--accent);
+        background: var(--surface2);
+      }
+
+      .history-card + .history-card {
+        border-top: 1px solid var(--border);
+      }
+
+      .hc-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+      }
+
+      .hc-avatar {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        object-fit: cover;
+        background: var(--surface2);
+        flex-shrink: 0;
+      }
+
+      .hc-name {
+        font-weight: 600;
+        font-size: 0.82rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .hc-handle {
+        font-size: 0.78rem;
+        color: var(--text-dim);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .hc-type-badge {
+        font-size: 0.68rem;
+        padding: 1px 6px;
+        border-radius: 3px;
+        background: rgba(29, 155, 240, 0.15);
+        color: var(--accent);
+        flex-shrink: 0;
+        text-transform: uppercase;
+        font-weight: 600;
+        letter-spacing: 0.03em;
+      }
+
+      .hc-time {
+        font-size: 0.72rem;
+        color: var(--text-dim);
+        margin-left: auto;
+        flex-shrink: 0;
+        white-space: nowrap;
+      }
+
+      .hc-text {
+        font-size: 0.82rem;
+        line-height: 1.4;
+        color: var(--text);
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        margin-bottom: 6px;
+        word-break: break-word;
+      }
+
+      .hc-parent {
+        font-size: 0.75rem;
+        color: var(--text-dim);
+        padding: 4px 8px;
+        border-left: 2px solid var(--accent);
+        margin-bottom: 6px;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+
+      .hc-footer {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .hc-score-badge {
+        font-size: 0.75rem;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .hc-score-badge.high {
+        background: rgba(0, 200, 83, 0.15);
+        color: var(--green);
+      }
+
+      .hc-score-badge.mid {
+        background: rgba(255, 171, 0, 0.15);
+        color: var(--yellow);
+      }
+
+      .hc-score-badge.low {
+        background: rgba(255, 68, 68, 0.15);
+        color: var(--red);
+      }
+
+      .hc-meta {
+        font-size: 0.72rem;
+        color: var(--text-dim);
+      }
+
+      @media (max-width: 900px) {
+        .sidebar {
+          display: none;
+        }
       }
 
       h1 {
@@ -487,6 +679,78 @@
         font-variant-numeric: tabular-nums;
       }
 
+      /* Grade badges (MMORPG style) */
+      .grade-badge {
+        display: inline-block;
+        font-weight: 800;
+        font-size: 0.82rem;
+        padding: 2px 8px;
+        border-radius: 4px;
+        letter-spacing: 0.03em;
+        text-align: center;
+        min-width: 32px;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .grade-badge.grade-ss {
+        background: linear-gradient(135deg, #ff6bcb 0%, #c084fc 100%);
+        color: #fff;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+      }
+
+      .grade-badge.grade-splus {
+        background: rgba(192, 132, 252, 0.2);
+        color: #c084fc;
+      }
+
+      .grade-badge.grade-s {
+        background: rgba(251, 191, 36, 0.18);
+        color: #fbbf24;
+      }
+
+      .grade-badge.grade-a {
+        background: rgba(0, 200, 83, 0.15);
+        color: var(--green);
+      }
+
+      .grade-badge.grade-b {
+        background: rgba(29, 155, 240, 0.15);
+        color: var(--accent);
+      }
+
+      .grade-badge.grade-c {
+        background: rgba(255, 171, 0, 0.15);
+        color: var(--yellow);
+      }
+
+      .grade-badge.grade-d {
+        background: rgba(255, 68, 68, 0.12);
+        color: var(--red);
+      }
+
+      .final-grade {
+        font-size: 2.8rem;
+        font-weight: 900;
+        text-align: center;
+        padding: 12px 0 2px;
+        letter-spacing: 0.04em;
+        background: none;
+      }
+
+      .final-grade.grade-ss {
+        background: linear-gradient(135deg, #ff6bcb, #c084fc);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+
+      .final-grade-sublabel {
+        text-align: center;
+        font-size: 0.75rem;
+        color: var(--text-dim);
+        padding-bottom: 8px;
+      }
+
       /* Score pipeline */
       .pipeline-row {
         display: flex;
@@ -638,79 +902,197 @@
         padding: 12px;
         font-style: italic;
       }
+
+      /* Cost summary */
+      .cost-summary {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+        justify-content: center;
+        padding: 12px 16px;
+        font-size: 0.78rem;
+        color: var(--text-dim);
+        border-top: 1px solid var(--border);
+        margin-top: 8px;
+      }
+
+      .cost-item {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .cost-item .cost-label {
+        color: var(--text-dim);
+      }
+
+      .cost-item .cost-tokens {
+        color: var(--text-dim);
+        font-size: 0.72rem;
+      }
+
+      .cost-item .cost-value {
+        color: var(--text);
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .cost-divider {
+        width: 1px;
+        height: 14px;
+        background: var(--border);
+      }
+
+      .cost-total {
+        font-weight: 700;
+        color: var(--accent);
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* Post button */
+      .post-section {
+        text-align: center;
+        margin-top: 16px;
+      }
+
+      .post-btn {
+        padding: 12px 32px;
+        background: var(--green);
+        border: none;
+        border-radius: var(--radius);
+        color: #fff;
+        font-family: inherit;
+        font-size: 0.95rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition:
+          background 0.15s,
+          opacity 0.15s;
+      }
+
+      .post-btn:hover {
+        background: #00b848;
+      }
+
+      .post-btn:disabled {
+        background: var(--surface2);
+        color: var(--text-dim);
+        cursor: not-allowed;
+        opacity: 0.7;
+      }
+
+      .post-gate-msg {
+        font-size: 0.78rem;
+        color: var(--text-dim);
+        margin-top: 6px;
+      }
+
+      .post-success {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 20px;
+        background: rgba(0, 200, 83, 0.1);
+        border: 1px solid var(--green);
+        border-radius: var(--radius);
+        color: var(--green);
+        font-size: 0.85rem;
+        font-weight: 600;
+      }
+
+      .post-success a {
+        color: var(--accent);
+        text-decoration: underline;
+      }
     </style>
   </head>
   <body>
-    <div class="container">
-      <h1>Tweet Virality Analyzer</h1>
-      <p class="subtitle">Score tweets using the 𝕏 recommendation algorithm's scoring pipeline</p>
-
-      <!-- Profile card -->
-      <a class="profile-card hidden" id="profile-card" href="#" target="_blank" rel="noopener">
-        <img class="profile-avatar" id="profile-avatar" src="" alt="" />
-        <div class="profile-info">
-          <div class="profile-name" id="profile-name"></div>
-          <div class="profile-handle" id="profile-handle"></div>
+    <div class="app-layout">
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+          <h2>History</h2>
+          <div class="sidebar-usage" id="sidebar-usage"></div>
         </div>
-        <div class="profile-followers" id="profile-followers"></div>
-      </a>
-
-      <!-- Tweet type -->
-      <div class="card">
-        <label>Tweet Type</label>
-        <div class="tweet-type-tabs">
-          <button id="tab-tweet" class="active" type="button">Tweet</button>
-          <button id="tab-reply" type="button">Reply</button>
-          <button id="tab-quote" type="button">Quote</button>
-        </div>
-
-        <!-- Parent tweet (reply/quote) -->
-        <div class="parent-section" id="parent-section">
-          <label id="parent-label">Replying to</label>
-          <div class="parent-url-row">
-            <input
-              type="text"
-              id="parent-url"
-              placeholder="Paste tweet URL (e.g. https://x.com/user/status/123)"
-            />
-            <button class="fetch-btn" id="fetch-btn" type="button">Fetch</button>
+        <div class="sidebar-list" id="sidebar-list">
+          <div class="sidebar-empty" id="sidebar-empty">
+            No analyzed tweets yet. Score a tweet to see it here.
           </div>
-          <div class="parent-preview" id="parent-preview"></div>
-          <div class="parent-hint">Paste a tweet URL to provide context for scoring</div>
+        </div>
+      </aside>
+      <div class="container">
+        <h1>Tweet Virality Analyzer</h1>
+        <p class="subtitle">Score tweets using the 𝕏 recommendation algorithm's scoring pipeline</p>
+
+        <!-- Profile card -->
+        <a class="profile-card hidden" id="profile-card" href="#" target="_blank" rel="noopener">
+          <img class="profile-avatar" id="profile-avatar" src="" alt="" />
+          <div class="profile-info">
+            <div class="profile-name" id="profile-name"></div>
+            <div class="profile-handle" id="profile-handle"></div>
+          </div>
+          <div class="profile-followers" id="profile-followers"></div>
+        </a>
+
+        <!-- Tweet type -->
+        <div class="card">
+          <label>Tweet Type</label>
+          <div class="tweet-type-tabs">
+            <button id="tab-tweet" class="active" type="button">Tweet</button>
+            <button id="tab-reply" type="button">Reply</button>
+            <button id="tab-quote" type="button">Quote</button>
+          </div>
+
+          <!-- Parent tweet (reply/quote) -->
+          <div class="parent-section" id="parent-section">
+            <label id="parent-label">Replying to</label>
+            <div class="parent-url-row">
+              <input
+                type="text"
+                id="parent-url"
+                placeholder="Paste tweet URL (e.g. https://x.com/user/status/123)"
+              />
+              <button class="fetch-btn" id="fetch-btn" type="button">Fetch</button>
+            </div>
+            <div class="parent-preview" id="parent-preview"></div>
+            <div class="parent-hint">Paste a tweet URL to provide context for scoring</div>
+          </div>
+
+          <label for="tweet-text" style="margin-top: 12px">Your Tweet</label>
+          <textarea id="tweet-text" placeholder="What's happening?"></textarea>
+          <div class="char-count" id="char-count">0 / 280</div>
+
+          <label style="margin-top: 14px">Media</label>
+          <div class="drop-zone" id="drop-zone">
+            Drop an image, video, or GIF here to detect media type &mdash; or click to select
+            <input type="file" id="file-input" accept="image/*,video/*" hidden />
+          </div>
         </div>
 
-        <label for="tweet-text" style="margin-top: 12px">Your Tweet</label>
-        <textarea id="tweet-text" placeholder="What's happening?"></textarea>
-        <div class="char-count" id="char-count">0 / 280</div>
-
-        <label style="margin-top: 14px">Media</label>
-        <div class="drop-zone" id="drop-zone">
-          Drop an image, video, or GIF here to detect media type &mdash; or click to select
-          <input type="file" id="file-input" accept="image/*,video/*" hidden />
-        </div>
-      </div>
-
-      <!-- Options card -->
-      <div class="card">
-        <div class="options-row">
-          <div class="opt-group">
-            <label>Audience</label>
-            <div class="toggle-group">
-              <button id="btn-in-net" type="button">Followers</button>
-              <button id="btn-oon" class="active" type="button">Non-followers</button>
+        <!-- Options card -->
+        <div class="card">
+          <div class="options-row">
+            <div class="opt-group">
+              <label>Audience</label>
+              <div class="toggle-group">
+                <button id="btn-in-net" type="button">Followers</button>
+                <button id="btn-oon" class="active" type="button">Non-followers</button>
+              </div>
             </div>
           </div>
         </div>
+
+        <button class="rank-btn" id="rank-btn" type="button">Rank</button>
+
+        <div class="spinner-wrap" id="spinner">
+          <div class="spinner"></div>
+          <div class="spinner-text" id="spinner-text">
+            Estimating engagement with Grok-3-mini...
+          </div>
+        </div>
+
+        <div id="results"></div>
       </div>
-
-      <button class="rank-btn" id="rank-btn" type="button">Rank</button>
-
-      <div class="spinner-wrap" id="spinner">
-        <div class="spinner"></div>
-        <div class="spinner-text" id="spinner-text">Estimating engagement with Grok-3-mini...</div>
-      </div>
-
-      <div id="results"></div>
     </div>
 
     <script>
@@ -743,11 +1125,91 @@
         const fetchBtn = document.getElementById("fetch-btn");
         const parentPreview = document.getElementById("parent-preview");
 
+        // Sidebar elements
+        const sidebarList = document.getElementById("sidebar-list");
+        const sidebarEmpty = document.getElementById("sidebar-empty");
+        const sidebarUsage = document.getElementById("sidebar-usage");
+
         let tweetType = "tweet";
         let detectedMedia = null;
         let detectedVideoDurationMs = null;
         let fetchedParentText = null;
+        let fetchedParentData = null;
         let profileFollowerCount = null;
+        let activeRunId = null;
+
+        // --- Parent tweet cache (browser localStorage, 24h TTL) ---
+        const PARENT_CACHE_KEY = "tva_parent_cache";
+        const PARENT_CACHE_TTL = 24 * 60 * 60 * 1000; // 24h
+
+        function loadParentCache() {
+          try {
+            return JSON.parse(localStorage.getItem(PARENT_CACHE_KEY)) || {};
+          } catch {
+            return {};
+          }
+        }
+
+        function saveParentCache(cache) {
+          localStorage.setItem(PARENT_CACHE_KEY, JSON.stringify(cache));
+        }
+
+        function getCachedParent(url) {
+          const cache = loadParentCache();
+          const entry = cache[url];
+          if (!entry) return null;
+          if (Date.now() - entry.cachedAt > PARENT_CACHE_TTL) {
+            delete cache[url];
+            saveParentCache(cache);
+            return null;
+          }
+          return entry;
+        }
+
+        function setCachedParent(url, data) {
+          const cache = loadParentCache();
+          cache[url] = { ...data, cachedAt: Date.now() };
+          saveParentCache(cache);
+        }
+
+        function formatRelativeTime(timestamp) {
+          const diff = Date.now() - timestamp;
+          const secs = Math.floor(diff / 1000);
+          if (secs < 60) return "just now";
+          const mins = Math.floor(secs / 60);
+          if (mins < 60) return mins + "m ago";
+          const hrs = Math.floor(mins / 60);
+          if (hrs < 24) return hrs + "h ago";
+          const days = Math.floor(hrs / 24);
+          if (days < 7) return days + "d ago";
+          return new Date(timestamp).toLocaleDateString();
+        }
+
+        function scoreColorClass(score) {
+          if (score >= 3) return "high";
+          if (score >= 1) return "mid";
+          return "low";
+        }
+
+        // --- Usage display ---
+        async function loadUsage() {
+          try {
+            const resp = await fetch("/api/usage");
+            const data = await resp.json();
+            if (data.error) return;
+            sidebarUsage.textContent =
+              data.reads +
+              "/" +
+              data.readLimit +
+              " reads, " +
+              data.writes +
+              "/" +
+              data.writeLimit +
+              " posts";
+          } catch {
+            // Usage load is optional
+          }
+        }
 
         // --- Profile ---
         async function loadProfile() {
@@ -801,15 +1263,46 @@
           return /(?:twitter\.com|x\.com)\/\w+\/status\/\d+/.test(text);
         }
 
+        function renderParentPreview(data, fromCache) {
+          fetchedParentText = data.text;
+          fetchedParentData = data;
+
+          let html =
+            '<div class="parent-preview-author"><strong>' +
+            escHtml(data.authorName) +
+            "</strong> @" +
+            escHtml(data.authorUsername) +
+            (fromCache
+              ? ' <span style="font-size:0.7rem;color:var(--text-dim)">(cached)</span>'
+              : "") +
+            "</div>" +
+            escHtml(data.text);
+
+          if (data.mediaType) {
+            html += '<div class="parent-preview-media">' + escHtml(data.mediaType) + "</div>";
+          }
+
+          parentPreview.innerHTML = html;
+          parentPreview.classList.add("visible");
+        }
+
         async function fetchParentTweet() {
           const url = parentUrlInput.value.trim();
           if (!url) return;
+
+          // Check cache first
+          const cached = getCachedParent(url);
+          if (cached) {
+            renderParentPreview(cached, true);
+            return;
+          }
 
           fetchBtn.disabled = true;
           fetchBtn.textContent = "...";
           parentPreview.classList.remove("visible");
           parentPreview.innerHTML = "";
           fetchedParentText = null;
+          fetchedParentData = null;
 
           try {
             const resp = await fetch("/api/tweet?url=" + encodeURIComponent(url));
@@ -817,22 +1310,9 @@
 
             if (data.error) throw new Error(data.error);
 
-            fetchedParentText = data.text;
-
-            let html =
-              '<div class="parent-preview-author"><strong>' +
-              escHtml(data.authorName) +
-              "</strong> @" +
-              escHtml(data.authorUsername) +
-              "</div>" +
-              escHtml(data.text);
-
-            if (data.mediaType) {
-              html += '<div class="parent-preview-media">' + escHtml(data.mediaType) + "</div>";
-            }
-
-            parentPreview.innerHTML = html;
-            parentPreview.classList.add("visible");
+            // Cache the result
+            setCachedParent(url, data);
+            renderParentPreview(data, false);
           } catch (err) {
             parentPreview.innerHTML =
               '<span style="color:var(--red)">' + escHtml(err.message) + "</span>";
@@ -1008,6 +1488,14 @@
             parentText: fetchedParentText || undefined,
             videoDurationMs,
             inNetwork,
+            // Extra fields for DB persistence
+            parentUrl: parentUrlInput.value.trim() || undefined,
+            parentAuthorName: fetchedParentData ? fetchedParentData.authorName : undefined,
+            parentAuthorUsername: fetchedParentData ? fetchedParentData.authorUsername : undefined,
+            parentTweetId: fetchedParentData ? fetchedParentData.id || undefined : undefined,
+            authorName: profileName.textContent || undefined,
+            authorHandle: profileHandle.textContent || undefined,
+            authorAvatar: profileAvatar.src || undefined,
           };
 
           lockUI();
@@ -1027,24 +1515,43 @@
             const scored = await scoreResp.json();
             if (!scoreResp.ok) throw new Error(scored.error || "Scoring failed");
 
+            // Extract cost data and runId from score response
+            var scoreCost = scored.cost || null;
+            activeRunId = scored.runId || null;
+
             // Show scores immediately
             renderScores(scored);
             resultsDiv.classList.add("visible");
+
+            // Refresh sidebar from server
+            await refreshSidebar();
 
             // Phase 2: Gemini analysis
             spinnerText.textContent = "Analyzing with Gemini...";
             const geminiResp = await fetch("/api/gemini", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ ...payload, scored }),
+              body: JSON.stringify({ ...payload, scored, runId: activeRunId }),
             });
 
             const analysis = await geminiResp.json();
+            var geminiCost = null;
             if (geminiResp.ok && !analysis.error) {
+              geminiCost = analysis.cost || null;
               appendAnalysis(analysis);
             } else {
               appendAnalysisError(analysis.error || "Gemini analysis failed");
             }
+
+            // Show combined cost summary
+            appendCostSummary(scoreCost, geminiCost);
+
+            // Show post button (gated on score)
+            var parentId = fetchedParentData ? fetchedParentData.id || null : null;
+            appendPostButton(scored.finalScore, text, tweetType, parentId, null);
+
+            // Refresh usage stats
+            loadUsage();
 
             spinner.classList.remove("visible");
           } catch (err) {
@@ -1064,6 +1571,41 @@
             .replace(/"/g, "&quot;");
         }
 
+        // --- Grading functions (Japanese MMORPG scale) ---
+        var GRADE_COLORS = {
+          "grade-ss": "",
+          "grade-splus": "#c084fc",
+          "grade-s": "#fbbf24",
+          "grade-a": "#00c853",
+          "grade-b": "#1d9bf0",
+          "grade-c": "#ffab00",
+          "grade-d": "#ff4444",
+        };
+
+        function probToGrade(p) {
+          if (p >= 0.25) return { grade: "SS", css: "grade-ss" };
+          if (p >= 0.15) return { grade: "S+", css: "grade-splus" };
+          if (p >= 0.08) return { grade: "S", css: "grade-s" };
+          if (p >= 0.04) return { grade: "A", css: "grade-a" };
+          if (p >= 0.02) return { grade: "B", css: "grade-b" };
+          if (p >= 0.008) return { grade: "C", css: "grade-c" };
+          return { grade: "D", css: "grade-d" };
+        }
+
+        function scoreToGrade(s) {
+          if (s >= 5.0) return { grade: "SS", css: "grade-ss" };
+          if (s >= 3.5) return { grade: "S+", css: "grade-splus" };
+          if (s >= 2.0) return { grade: "S", css: "grade-s" };
+          if (s >= 1.2) return { grade: "A", css: "grade-a" };
+          if (s >= 0.6) return { grade: "B", css: "grade-b" };
+          if (s >= 0.2) return { grade: "C", css: "grade-c" };
+          return { grade: "D", css: "grade-d" };
+        }
+
+        function gradeBadge(g) {
+          return '<span class="grade-badge ' + g.css + '">' + g.grade + "</span>";
+        }
+
         function renderScores(scored) {
           let html = "";
 
@@ -1077,6 +1619,7 @@
 
           for (const e of positiveActions) {
             const pct = Math.min(e.probability * 100, 100);
+            const g = probToGrade(e.probability);
             html +=
               '<li class="prob-item">' +
               '<span class="prob-label">' +
@@ -1086,7 +1629,7 @@
               pct * 3.33 +
               '%"></div></div>' +
               '<span class="prob-value">' +
-              e.probability.toFixed(4) +
+              gradeBadge(g) +
               "</span>" +
               "</li>";
           }
@@ -1099,6 +1642,7 @@
             html += '<ul class="prob-list">';
             for (const e of negativeActions) {
               const pct = Math.min(e.probability * 100, 100);
+              const g = probToGrade(e.probability);
               html +=
                 '<li class="prob-item">' +
                 '<span class="prob-label">' +
@@ -1108,7 +1652,7 @@
                 pct * 3.33 +
                 '%"></div></div>' +
                 '<span class="prob-value">' +
-                e.probability.toFixed(4) +
+                gradeBadge(g) +
                 "</span>" +
                 "</li>";
             }
@@ -1131,18 +1675,17 @@
             scored.finalScore
           );
 
-          const sc =
-            scored.finalScore >= 3
-              ? "var(--green)"
-              : scored.finalScore >= 1
-                ? "var(--yellow)"
-                : "var(--red)";
+          const finalG = scoreToGrade(scored.finalScore);
+          const finalColor = GRADE_COLORS[finalG.css];
           html +=
-            '<div class="final-score" style="color:' +
-            sc +
-            '">' +
-            scored.finalScore.toFixed(4) +
+            '<div class="final-grade ' +
+            finalG.css +
+            '"' +
+            (finalColor ? ' style="color:' + finalColor + '"' : "") +
+            ">" +
+            finalG.grade +
             "</div>";
+          html += '<div class="final-grade-sublabel">' + scored.finalScore.toFixed(4) + "</div>";
           html += "</div>";
 
           resultsDiv.innerHTML = html;
@@ -1203,15 +1746,395 @@
           );
         }
 
+        function appendCostSummary(scoreCost, geminiCost) {
+          var items = [];
+
+          if (scoreCost && scoreCost.grok) {
+            var g = scoreCost.grok;
+            var cachedInfo =
+              g.usage.cachedTokens > 0
+                ? " [" + Number(g.usage.cachedTokens).toLocaleString() + " cached]"
+                : "";
+            items.push(
+              '<span class="cost-item">' +
+                '<span class="cost-label">Grok</span> ' +
+                '<span class="cost-tokens">(' +
+                Number(g.usage.inputTokens).toLocaleString() +
+                " in" +
+                cachedInfo +
+                " / " +
+                Number(g.usage.outputTokens).toLocaleString() +
+                " out)</span> " +
+                '<span class="cost-value">$' +
+                g.cost.toFixed(6) +
+                "</span>" +
+                "</span>"
+            );
+          }
+
+          if (geminiCost && geminiCost.gemini) {
+            var m = geminiCost.gemini;
+            items.push(
+              '<span class="cost-item">' +
+                '<span class="cost-label">Gemini</span> ' +
+                '<span class="cost-tokens">(' +
+                Number(m.usage.inputTokens).toLocaleString() +
+                " in / " +
+                Number(m.usage.outputTokens).toLocaleString() +
+                " out)</span> " +
+                '<span class="cost-value">$' +
+                m.cost.toFixed(6) +
+                "</span>" +
+                "</span>"
+            );
+          }
+
+          if (scoreCost && scoreCost.xApi) {
+            var x = scoreCost.xApi;
+            var xParts = [];
+            if (x.reads > 0) xParts.push(x.reads + " read" + (x.reads !== 1 ? "s" : ""));
+            if (x.writes > 0) xParts.push(x.writes + " write" + (x.writes !== 1 ? "s" : ""));
+            items.push(
+              '<span class="cost-item">' +
+                '<span class="cost-label">X API</span> ' +
+                '<span class="cost-tokens">(' +
+                xParts.join(", ") +
+                ")</span> " +
+                '<span class="cost-value" style="color:var(--text-dim)">free</span>' +
+                "</span>"
+            );
+          }
+
+          if (items.length === 0) return;
+
+          var total = 0;
+          if (scoreCost) total += scoreCost.totalCost || 0;
+          if (geminiCost) total += geminiCost.totalCost || 0;
+
+          var html =
+            '<div class="cost-summary">' +
+            items.join('<span class="cost-divider"></span>') +
+            '<span class="cost-divider"></span>' +
+            '<span class="cost-item"><span class="cost-label">Total</span> <span class="cost-total">$' +
+            total.toFixed(6) +
+            "</span></span>" +
+            "</div>";
+
+          resultsDiv.insertAdjacentHTML("beforeend", html);
+        }
+
+        var POST_SCORE_THRESHOLD = 2.0; // S grade
+
+        function appendPostButton(
+          finalScore,
+          tweetText,
+          currentTweetType,
+          parentTweetId,
+          postedId
+        ) {
+          var isViral = finalScore >= POST_SCORE_THRESHOLD;
+          var grade = scoreToGrade(POST_SCORE_THRESHOLD);
+
+          var html = '<div class="post-section">';
+
+          if (postedId) {
+            html +=
+              '<div class="post-success">Posted! <a href="https://x.com/i/status/' +
+              escHtml(postedId) +
+              '" target="_blank" rel="noopener">View on X</a></div>';
+          } else if (isViral) {
+            html +=
+              '<button class="post-btn" id="post-btn" type="button"' +
+              ' data-text="' +
+              escHtml(tweetText) +
+              '"' +
+              ' data-type="' +
+              escHtml(currentTweetType) +
+              '"' +
+              (parentTweetId ? ' data-parent-id="' + escHtml(parentTweetId) + '"' : "") +
+              ">Post to X</button>";
+          } else {
+            html +=
+              '<button class="post-btn" disabled type="button">Post to X</button>' +
+              '<div class="post-gate-msg">Needs ' +
+              grade.grade +
+              " grade or higher to post (score &ge; " +
+              POST_SCORE_THRESHOLD.toFixed(1) +
+              ")</div>";
+          }
+
+          html += "</div>";
+          resultsDiv.insertAdjacentHTML("beforeend", html);
+
+          if (isViral && !postedId) {
+            document.getElementById("post-btn").addEventListener("click", handlePostClick);
+          }
+        }
+
+        async function handlePostClick(e) {
+          var btn = e.target;
+          var text = btn.dataset.text;
+          var type = btn.dataset.type;
+          var parentId = btn.dataset.parentId || null;
+
+          btn.disabled = true;
+          btn.textContent = "Posting...";
+
+          var body = { text: text, runId: activeRunId };
+          if (type === "reply" && parentId) body.replyToTweetId = parentId;
+          if (type === "quote" && parentId) body.quoteTweetId = parentId;
+
+          try {
+            var resp = await fetch("/api/post", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(body),
+            });
+            var data = await resp.json();
+            if (!resp.ok) throw new Error(data.error || "Post failed");
+
+            // Replace button with success
+            var section = btn.closest(".post-section");
+            section.innerHTML =
+              '<div class="post-success">Posted! <a href="https://x.com/i/status/' +
+              escHtml(data.id) +
+              '" target="_blank" rel="noopener">View on X</a></div>';
+
+            // Refresh usage and sidebar
+            loadUsage();
+            refreshSidebar();
+          } catch (err) {
+            btn.disabled = false;
+            btn.textContent = "Post to X";
+            var section = btn.closest(".post-section");
+            section.insertAdjacentHTML(
+              "beforeend",
+              '<div class="post-gate-msg" style="color:var(--red)">' +
+                escHtml(err.message) +
+                "</div>"
+            );
+          }
+        }
+
         function pipelineRow(label, value) {
+          const g = scoreToGrade(value);
           return (
             '<div class="pipeline-row"><span class="pipeline-label">' +
             escHtml(label) +
             '</span><span class="pipeline-value">' +
-            value.toFixed(4) +
+            gradeBadge(g) +
             "</span></div>"
           );
         }
+
+        // --- Sidebar rendering (from API) ---
+        async function refreshSidebar() {
+          try {
+            const resp = await fetch("/api/history");
+            const entries = await resp.json();
+            if (entries.error) return;
+            renderSidebarFromEntries(entries);
+          } catch {
+            // Sidebar refresh is non-critical
+          }
+        }
+
+        function renderSidebarFromEntries(entries) {
+          if (!entries || entries.length === 0) {
+            sidebarEmpty.style.display = "";
+            const cards = sidebarList.querySelectorAll(".history-card");
+            cards.forEach((c) => c.remove());
+            return;
+          }
+
+          sidebarEmpty.style.display = "none";
+          let html = "";
+          for (const entry of entries) {
+            html += renderHistoryCard(entry);
+          }
+          const existingCards = sidebarList.querySelectorAll(".history-card");
+          existingCards.forEach((c) => c.remove());
+          sidebarEmpty.insertAdjacentHTML("afterend", html);
+
+          // Attach click handlers
+          sidebarList.querySelectorAll(".history-card").forEach((card) => {
+            card.addEventListener("click", () => {
+              viewHistoryEntry(card.dataset.id);
+            });
+          });
+        }
+
+        function renderHistoryCard(entry) {
+          const isActive = entry.id === activeRunId;
+          const score = entry.finalScore;
+
+          let typeBadge = "";
+          if (entry.tweetType === "reply") {
+            typeBadge = '<span class="hc-type-badge">Reply</span>';
+          } else if (entry.tweetType === "quote") {
+            typeBadge = '<span class="hc-type-badge">Quote</span>';
+          }
+
+          let parentHtml = "";
+          if ((entry.tweetType === "reply" || entry.tweetType === "quote") && entry.parentText) {
+            const parentAuthor = entry.parentAuthorUsername
+              ? "@" + escHtml(entry.parentAuthorUsername) + ": "
+              : "";
+            parentHtml =
+              '<div class="hc-parent">' + parentAuthor + escHtml(entry.parentText) + "</div>";
+          }
+
+          const avatarHtml = entry.authorAvatar
+            ? '<img class="hc-avatar" src="' + escHtml(entry.authorAvatar) + '" alt="" />'
+            : "";
+
+          const nameHtml = entry.authorName
+            ? '<span class="hc-name">' + escHtml(entry.authorName) + "</span>"
+            : "";
+
+          const handleHtml = entry.authorHandle
+            ? '<span class="hc-handle">' + escHtml(entry.authorHandle) + "</span>"
+            : "";
+
+          let mediaHtml = "";
+          if (entry.mediaType) {
+            mediaHtml = '<span class="hc-meta">' + escHtml(entry.mediaType) + "</span>";
+          }
+
+          const audienceHtml =
+            '<span class="hc-meta">' +
+            (entry.inNetwork ? "Followers" : "Non-followers") +
+            "</span>";
+
+          return (
+            '<div class="history-card' +
+            (isActive ? " active" : "") +
+            '" data-id="' +
+            entry.id +
+            '">' +
+            '<div class="hc-header">' +
+            avatarHtml +
+            nameHtml +
+            handleHtml +
+            typeBadge +
+            '<span class="hc-time">' +
+            formatRelativeTime(entry.timestamp) +
+            "</span>" +
+            "</div>" +
+            '<div class="hc-text">' +
+            escHtml(entry.text) +
+            "</div>" +
+            parentHtml +
+            '<div class="hc-footer">' +
+            (score !== null
+              ? (function () {
+                  var g = scoreToGrade(score);
+                  return (
+                    '<span class="hc-score-badge grade-badge ' + g.css + '">' + g.grade + "</span>"
+                  );
+                })()
+              : "") +
+            mediaHtml +
+            audienceHtml +
+            "</div>" +
+            "</div>"
+          );
+        }
+
+        // --- Click-to-view history entry (fetch full detail from API) ---
+        async function viewHistoryEntry(id) {
+          try {
+            const resp = await fetch("/api/history/" + encodeURIComponent(id));
+            const entry = await resp.json();
+            if (entry.error) return;
+
+            activeRunId = id;
+            // Re-render sidebar to update active state
+            refreshSidebar();
+
+            // Refill textarea
+            textarea.value = entry.text;
+            const len = entry.text.length;
+            charCount.textContent = len + " / 280";
+            charCount.classList.toggle("over", len > 280);
+
+            // Switch tweet type
+            setTweetType(entry.tweetType || "tweet");
+
+            // Refill parent data if reply/quote
+            if ((entry.tweetType === "reply" || entry.tweetType === "quote") && entry.parentUrl) {
+              parentUrlInput.value = entry.parentUrl;
+              if (entry.parentText) {
+                fetchedParentText = entry.parentText;
+                fetchedParentData = {
+                  id: entry.parentTweetId || null,
+                  text: entry.parentText,
+                  authorName: entry.parentAuthorName || "",
+                  authorUsername: entry.parentAuthorUsername || "",
+                };
+                renderParentPreview(fetchedParentData, true);
+              }
+            } else {
+              parentUrlInput.value = "";
+              parentPreview.classList.remove("visible");
+              parentPreview.innerHTML = "";
+              fetchedParentText = null;
+              fetchedParentData = null;
+            }
+
+            // Set audience toggle
+            if (entry.inNetwork) {
+              btnInNet.classList.add("active");
+              btnOon.classList.remove("active");
+            } else {
+              btnOon.classList.add("active");
+              btnInNet.classList.remove("active");
+            }
+
+            // Show media type indicator (can't restore actual file)
+            if (entry.mediaType && entry.mediaType !== "link") {
+              detectedMedia = entry.mediaType;
+              detectedVideoDurationMs = entry.videoDurationMs || null;
+              updateMediaDisplay();
+            } else {
+              clearMedia();
+            }
+
+            // Show stored results
+            resultsDiv.innerHTML = "";
+            resultsDiv.classList.remove("visible");
+            spinner.classList.remove("visible");
+
+            if (entry.scoredResult) {
+              renderScores(entry.scoredResult);
+              resultsDiv.classList.add("visible");
+            }
+
+            if (entry.geminiAnalysis) {
+              appendAnalysis(entry.geminiAnalysis);
+            }
+
+            if (entry.costData) {
+              appendCostSummary(entry.costData.scoreCost, entry.costData.geminiCost);
+            }
+
+            if (entry.scoredResult) {
+              appendPostButton(
+                entry.scoredResult.finalScore,
+                entry.text,
+                entry.tweetType || "tweet",
+                entry.parentTweetId || null,
+                entry.postedTweetId || null
+              );
+            }
+          } catch {
+            // View failed silently
+          }
+        }
+
+        // --- Initialize on load ---
+        refreshSidebar();
+        loadUsage();
       })();
     </script>
   </body>
