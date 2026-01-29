@@ -85,3 +85,19 @@ export interface GeminiAnalysis {
   suggestions: string[];
   revisedTweet: string;
 }
+
+/** Context from a prior run to inform Gemini analysis */
+export interface PriorRunContext {
+  text: string;
+  tweetType: string;
+  mediaType: string | null;
+  finalScore: number;
+  viralityRating: number;
+  assessment: string;
+  weightBreakdown: Array<{
+    action: string;
+    probability: number;
+    weight: number;
+    contribution: number;
+  }>;
+}

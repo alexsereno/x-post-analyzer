@@ -3,10 +3,61 @@
  * strengths/weaknesses, and suggestions based on the scored result.
  */
 
-import type { ScoredResult, GeminiAnalysis, TweetInput, TokenUsage } from "../types.js";
+import type {
+  ScoredResult,
+  GeminiAnalysis,
+  TweetInput,
+  TokenUsage,
+  PriorRunContext,
+} from "../types.js";
 import { GEMINI_API_URL } from "../config.js";
 
-function buildPrompt(input: TweetInput, result: ScoredResult): string {
+function buildHistorySection(priorRuns?: PriorRunContext[]): string {
+  if (!priorRuns || priorRuns.length === 0) {
+    return "";
+  }
+
+  const entries = priorRuns.map((run, i) => {
+    const typeLabel = run.tweetType !== "tweet" ? ` (${run.tweetType})` : "";
+    const mediaLabel = run.mediaType ? ` [${run.mediaType}]` : "";
+
+    // Format weight breakdown - show top 5 contributors
+    const topBreakdown = [...run.weightBreakdown]
+      .sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution))
+      .slice(0, 5)
+      .map(
+        (w) =>
+          `${w.action}: P=${w.probability.toFixed(4)} × W=${w.weight} = ${w.contribution.toFixed(4)}`
+      )
+      .join("\n      ");
+
+    return `### Run ${i + 1}${typeLabel}${mediaLabel}
+Tweet: "${run.text}"
+Score: ${run.finalScore.toFixed(4)} | Virality: ${run.viralityRating}/10
+Assessment: ${run.assessment}
+Top contributors:
+      ${topBreakdown}`;
+  });
+
+  return `
+
+## Prior Runs (${priorRuns.length} recent analyses)
+
+Use this history to inform your analysis:
+- Identify patterns in what scores well vs poorly for THIS user's writing style
+- Reference specific prior runs when relevant (e.g., "Similar to your Run #3 which scored X...")
+- Compare engagement probabilities across runs to spot trends
+- Tailor suggestions to their actual performance patterns, not generic advice
+
+${entries.join("\n\n")}
+`;
+}
+
+function buildPrompt(
+  input: TweetInput,
+  result: ScoredResult,
+  priorRuns?: PriorRunContext[]
+): string {
   const topContributors = [...result.weightBreakdown]
     .sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution))
     .slice(0, 8);
@@ -68,7 +119,7 @@ Raw weighted score: ${result.rawWeightedScore.toFixed(4)}
 After offset: ${result.offsetScore.toFixed(4)}
 After author diversity (×${result.diversityMultiplier.toFixed(2)}): ${result.diversityAdjustedScore.toFixed(4)}
 After OON adjustment (×${result.oonMultiplier.toFixed(2)}): ${result.finalScore.toFixed(4)}
-
+${buildHistorySection(priorRuns)}
 Provide your analysis as JSON with these fields:
 - assessment: 2-3 sentence overall assessment. Reference the specific weight values to explain why the score is what it is.
 - viralityRating: integer 1-10
@@ -87,7 +138,8 @@ export async function analyzeWithGemini(
   input: TweetInput,
   result: ScoredResult,
   apiKey: string,
-  model: string
+  model: string,
+  priorRuns?: PriorRunContext[]
 ): Promise<GeminiAnalysisResult> {
   const url = `${GEMINI_API_URL}/${model}:generateContent?key=${apiKey}`;
 
@@ -95,7 +147,7 @@ export async function analyzeWithGemini(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: buildPrompt(input, result) }] }],
+      contents: [{ parts: [{ text: buildPrompt(input, result, priorRuns) }] }],
       generationConfig: {
         responseMimeType: "application/json",
         responseSchema: {

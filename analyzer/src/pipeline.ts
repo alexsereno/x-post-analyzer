@@ -6,7 +6,14 @@
  * and optionally the Gemini analysis stage.
  */
 
-import type { TweetInput, ScoredResult, GeminiAnalysis, TokenUsage, RunCost } from "./types.js";
+import type {
+  TweetInput,
+  ScoredResult,
+  GeminiAnalysis,
+  TokenUsage,
+  RunCost,
+  PriorRunContext,
+} from "./types.js";
 import type { CalibrationTweet } from "./calibration.js";
 import { computeWeightedScore } from "./scoring/weighted-scorer.js";
 import { applyAuthorDiversity } from "./scoring/author-diversity-scorer.js";
@@ -72,9 +79,16 @@ export async function analyzeScores(
   input: TweetInput,
   scored: ScoredResult,
   geminiKey: string,
-  geminiModel: string
+  geminiModel: string,
+  priorRuns?: PriorRunContext[]
 ): Promise<AnalyzeScoresResult> {
-  const { analysis, usage } = await analyzeWithGemini(input, scored, geminiKey, geminiModel);
+  const { analysis, usage } = await analyzeWithGemini(
+    input,
+    scored,
+    geminiKey,
+    geminiModel,
+    priorRuns
+  );
   return { analysis, geminiUsage: usage };
 }
 

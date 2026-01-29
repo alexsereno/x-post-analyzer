@@ -28,6 +28,7 @@ import {
   getMonthlyUsage,
   getMonthlyCost,
   getAllMonthlyCosts,
+  getPriorRunsForContext,
 } from "./db.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -305,7 +306,14 @@ const server = createServer(async (req, res) => {
     try {
       const input = parseTweetInput(payload);
       const scored = payload.scored as ScoredResult;
-      const { analysis, geminiUsage } = await analyzeScores(input, scored, geminiKey, geminiModel);
+      const priorRuns = getPriorRunsForContext();
+      const { analysis, geminiUsage } = await analyzeScores(
+        input,
+        scored,
+        geminiKey,
+        geminiModel,
+        priorRuns
+      );
       const cost = calculateCost(undefined, geminiUsage);
 
       // Persist Gemini analysis to database

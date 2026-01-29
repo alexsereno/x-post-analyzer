@@ -343,3 +343,67 @@ export function getMonthlyUsage(): MonthlyUsage {
 
   return { month, reads, writes };
 }
+
+export interface PriorRunForContext {
+  text: string;
+  tweetType: string;
+  mediaType: string | null;
+  finalScore: number;
+  viralityRating: number;
+  assessment: string;
+  weightBreakdown: Array<{
+    action: string;
+    probability: number;
+    weight: number;
+    contribution: number;
+  }>;
+}
+
+/**
+ * Fetch recent completed runs to provide context for Gemini analysis.
+ * Returns up to `limit` runs that have both scores and Gemini analysis.
+ * Gemini has a massive context window (~1M tokens) so we can be generous.
+ */
+export function getPriorRunsForContext(limit = 50): PriorRunForContext[] {
+  const rows = db
+    .prepare(
+      `SELECT tweet_text, tweet_type, media_type, final_score, scored_result, gemini_analysis
+       FROM runs
+       WHERE scored_result IS NOT NULL AND gemini_analysis IS NOT NULL
+       ORDER BY created_at DESC
+       LIMIT ?`
+    )
+    .all(limit) as Array<{
+    tweet_text: string;
+    tweet_type: string;
+    media_type: string | null;
+    final_score: number;
+    scored_result: string;
+    gemini_analysis: string;
+  }>;
+
+  return rows.map((r) => {
+    const scored = JSON.parse(r.scored_result) as {
+      weightBreakdown: Array<{
+        action: string;
+        probability: number;
+        weight: number;
+        contribution: number;
+      }>;
+    };
+    const analysis = JSON.parse(r.gemini_analysis) as {
+      viralityRating: number;
+      assessment: string;
+    };
+
+    return {
+      text: r.tweet_text,
+      tweetType: r.tweet_type,
+      mediaType: r.media_type,
+      finalScore: r.final_score,
+      viralityRating: analysis.viralityRating,
+      assessment: analysis.assessment,
+      weightBreakdown: scored.weightBreakdown,
+    };
+  });
+}
