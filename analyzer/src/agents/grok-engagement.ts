@@ -11,26 +11,26 @@ import { XAI_API_URL } from "../config.js";
 import type { CalibrationTweet } from "../calibration.js";
 import { buildCalibrationPrompt } from "../calibration.js";
 
-const STATIC_CALIBRATION = `Calibration guidance — typical ranges for an average tweet:
-- favoriteScore: 0.01–0.15 (likes are the most common action)
-- replyScore: 0.001–0.05 (replies are less common)
-- retweetScore: 0.005–0.08 (retweets are moderately common)
-- photoExpandScore: 0.01–0.10 (only if image present, else ~0)
-- clickScore: 0.02–0.15 (clicking to expand/read)
-- profileClickScore: 0.005–0.05 (clicking the author's profile)
-- vqvScore: 0.01–0.10 (video quality view, only if video present, else ~0)
-- shareScore: 0.001–0.03 (sharing via share button)
-- shareViaDmScore: 0.001–0.02 (sharing via DM)
-- shareViaCopyLinkScore: 0.001–0.02 (copying the link)
-- dwellScore: 0.05–0.30 (pausing to read)
-- quoteScore: 0.001–0.03 (quote tweeting)
-- quotedClickScore: 0.005–0.05 (clicking a quoted tweet)
-- followAuthorScore: 0.0005–0.02 (following the author)
-- notInterestedScore: 0.001–0.05 (marking not interested)
-- blockAuthorScore: 0.0001–0.005 (blocking author)
-- muteAuthorScore: 0.0001–0.005 (muting author)
-- reportScore: 0.00005–0.002 (reporting the tweet)
-- dwellTime: 2.0–30.0 (expected dwell time in seconds, NOT a probability)`;
+const STATIC_CALIBRATION = `Typical probability ranges for reference:
+- favoriteScore: 0.01–0.15
+- replyScore: 0.001–0.05
+- retweetScore: 0.005–0.08
+- photoExpandScore: 0.01–0.10 (0 if no image)
+- clickScore: 0.02–0.15
+- profileClickScore: 0.005–0.05
+- vqvScore: 0.01–0.10 (0 if no video)
+- shareScore: 0.001–0.03
+- shareViaDmScore: 0.001–0.02
+- shareViaCopyLinkScore: 0.001–0.02
+- dwellScore: 0.05–0.30
+- quoteScore: 0.001–0.03
+- quotedClickScore: 0.005–0.05 (0 if not a quote tweet)
+- followAuthorScore: 0.0005–0.02
+- notInterestedScore: 0.0001–0.01
+- blockAuthorScore: 0.0001–0.005
+- muteAuthorScore: 0.0001–0.005
+- reportScore: 0.00005–0.002
+- dwellTime: 2.0–30.0 seconds`;
 
 /** Clamp scores for physical constraints based on tweet metadata. */
 function clampScores(scores: PhoenixScores, input: TweetInput): PhoenixScores {
@@ -86,34 +86,37 @@ function clampScores(scores: PhoenixScores, input: TweetInput): PhoenixScores {
 
 function buildSystemPrompt(calibration: CalibrationTweet[] | null): string {
   const intro = `You are an engagement prediction model for the X (Twitter) recommendation algorithm.
-Given a tweet, estimate the probability that an average viewer will take each of the 19 engagement actions.
-You were trained on massive X data — use your intuition about how tweets perform.`;
+
+First, identify the TARGET AUDIENCE for this tweet:
+- Who would this content resonate with? (e.g., tech Twitter, fitness community, mainstream)
+- What's the niche size and how competitive is it?
+
+Then, become that audience. Predict engagement as a typical member of that audience seeing this in their feed.
+
+The algorithm shows tweets to relevant audiences. Evaluate assuming good audience-content fit.`;
 
   const calibrationSection =
     calibration && calibration.length > 0
       ? buildCalibrationPrompt(calibration)
       : STATIC_CALIBRATION;
 
-  const factors = `Factors to consider:
-- Text length, clarity, and emotional valence
-- Media type (images boost photoExpand, videos boost vqv; no media → those scores should be 0)
-- If the actual image/GIF is provided, analyze its visual content (subject, quality, composition, emotional impact) to refine engagement estimates
-- Call-to-action presence (questions boost reply, "RT if" boosts retweet)
-- Controversy potential (increases both engagement AND negative signals)
-- Follower context (larger audiences have lower per-viewer engagement rates)
-- Whether the tweet is a reply or quote (affects visibility and engagement patterns)
-- Not a quote tweet → quotedClickScore should be 0
-
-Keep estimates realistic. Most probabilities should be well under 0.10.
-dwellTime is in seconds (not a probability).`;
+  const factors = `Considerations:
+- How does this compare to other content you see as a member of that audience?
+- Would you engage with this? Would you share it? Would you follow for more?
+- Media: images boost photoExpand, videos boost vqv; no media → 0
+- Not a quote tweet → quotedClickScore = 0
+- dwellTime is seconds, not a probability`;
 
   return `${intro}\n\n${calibrationSection}\n\n${factors}`;
 }
 
-function buildUserPrompt(input: TweetInput): string {
+function buildUserPrompt(input: TweetInput, imageDescription?: string): string {
   const parts = [`Tweet text: "${input.text}"`];
   if (input.media && input.media !== "none") {
-    parts.push(`Media: ${input.media}`);
+    parts.push(`Media type: ${input.media}`);
+    if (imageDescription) {
+      parts.push(`Image content: ${imageDescription}`);
+    }
   }
   if (input.isReply) {
     parts.push("Context: This is a reply to another tweet");
@@ -247,27 +250,13 @@ export async function estimateEngagement(
   input: TweetInput,
   apiKey: string,
   model: string,
-  calibration?: CalibrationTweet[] | null
+  calibration?: CalibrationTweet[] | null,
+  imageDescription?: string
 ): Promise<GrokEngagementResult> {
   const systemPrompt = buildSystemPrompt(calibration ?? null);
-  const userText = buildUserPrompt(input);
+  const userText = buildUserPrompt(input, imageDescription);
 
-  let result: Awaited<ReturnType<typeof callGrokApi>>;
-
-  if (input.mediaData) {
-    // Try multimodal first; fall back to text-only if the model doesn't support vision
-    const multimodalContent: Array<Record<string, unknown>> = [
-      { type: "image_url", image_url: { url: input.mediaData } },
-      { type: "text", text: userText },
-    ];
-    try {
-      result = await callGrokApi(systemPrompt, multimodalContent, model, apiKey);
-    } catch {
-      result = await callGrokApi(systemPrompt, userText, model, apiKey);
-    }
-  } else {
-    result = await callGrokApi(systemPrompt, userText, model, apiKey);
-  }
+  const result = await callGrokApi(systemPrompt, userText, model, apiKey);
 
   const rawScores = JSON.parse(result.content) as PhoenixScores;
   const scores = clampScores(rawScores, input);

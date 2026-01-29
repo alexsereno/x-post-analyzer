@@ -6,7 +6,7 @@
     <title>Tweet Virality Analyzer</title>
     <link
       rel="icon"
-      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect width='24' height='24' fill='%23000'/><path d='M13.52 10.45L20.14 3h-1.57l-5.74 6.47L8.33 3H3l6.94 9.8L3 20.28h1.57l6.07-6.85 4.85 6.85H21l-7.48-9.83zm-2.15 2.42l-.7-.98L5.2 4.16h2.41l4.52 6.28.7.97 5.86 8.14h-2.41l-4.91-6.68z' fill='white'/></svg>"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect width='24' height='24' fill='white' rx='4'/><path d='M13.52 10.45L20.14 3h-1.57l-5.74 6.47L8.33 3H3l6.94 9.8L3 20.28h1.57l6.07-6.85 4.85 6.85H21l-7.48-9.83zm-2.15 2.42l-.7-.98L5.2 4.16h2.41l4.52 6.28.7.97 5.86 8.14h-2.41l-4.91-6.68z' fill='black'/></svg>"
     />
     <style>
       *,
@@ -386,6 +386,7 @@
       .drop-zone.has-media {
         border-color: var(--green);
         color: var(--green);
+        padding: 12px;
       }
 
       .drop-zone .clear-btn {
@@ -396,6 +397,38 @@
         font-size: 0.8rem;
         margin-left: 8px;
         text-decoration: underline;
+      }
+
+      .media-preview-container {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .media-preview-thumb {
+        width: 80px;
+        height: 80px;
+        border-radius: 8px;
+        object-fit: cover;
+        background: var(--surface2);
+        flex-shrink: 0;
+      }
+
+      .media-preview-info {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+      }
+
+      .media-preview-type {
+        font-weight: 600;
+        text-transform: capitalize;
+      }
+
+      .media-preview-duration {
+        font-size: 0.8rem;
+        color: var(--text-dim);
       }
 
       /* Options row */
@@ -500,27 +533,6 @@
         flex: 1;
       }
 
-      .fetch-btn {
-        background: var(--surface2);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        color: var(--text);
-        font-family: inherit;
-        font-size: 0.85rem;
-        padding: 8px 16px;
-        cursor: pointer;
-        transition: border-color 0.15s;
-        white-space: nowrap;
-      }
-
-      .fetch-btn:hover {
-        border-color: var(--accent);
-      }
-      .fetch-btn:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-      }
-
       .parent-preview {
         display: none;
         margin-top: 10px;
@@ -554,6 +566,15 @@
         background: rgba(29, 155, 240, 0.1);
         padding: 2px 8px;
         border-radius: 4px;
+      }
+
+      .parent-preview-media-img {
+        display: block;
+        margin-top: 8px;
+        max-width: 100%;
+        max-height: 150px;
+        border-radius: 8px;
+        object-fit: cover;
       }
 
       .parent-hint {
@@ -1086,7 +1107,6 @@
                 id="parent-url"
                 placeholder="Paste tweet URL (e.g. https://x.com/user/status/123)"
               />
-              <button class="fetch-btn" id="fetch-btn" type="button">Fetch</button>
             </div>
             <div class="parent-preview" id="parent-preview"></div>
             <div class="parent-hint">Paste a tweet URL to provide context for scoring</div>
@@ -1156,7 +1176,6 @@
         const parentSection = document.getElementById("parent-section");
         const parentLabel = document.getElementById("parent-label");
         const parentUrlInput = document.getElementById("parent-url");
-        const fetchBtn = document.getElementById("fetch-btn");
         const parentPreview = document.getElementById("parent-preview");
 
         // Sidebar elements
@@ -1168,6 +1187,7 @@
         let detectedMedia = null;
         let detectedMediaData = null;
         let detectedVideoDurationMs = null;
+        let detectedMediaPreviewUrl = null;
         let fetchedParentText = null;
         let fetchedParentData = null;
         let profileFollowerCount = null;
@@ -1323,7 +1343,14 @@
             "</div>" +
             escHtml(data.text);
 
-          if (data.mediaType) {
+          if (data.mediaUrl) {
+            html +=
+              '<img class="parent-preview-media-img" src="' +
+              escHtml(data.mediaUrl) +
+              '" alt="' +
+              escHtml(data.mediaType || "media") +
+              '" />';
+          } else if (data.mediaType) {
             html += '<div class="parent-preview-media">' + escHtml(data.mediaType) + "</div>";
           }
 
@@ -1342,10 +1369,9 @@
             return;
           }
 
-          fetchBtn.disabled = true;
-          fetchBtn.textContent = "...";
           parentPreview.classList.remove("visible");
-          parentPreview.innerHTML = "";
+          parentPreview.innerHTML = '<span style="color:var(--text-dim)">Loading...</span>';
+          parentPreview.classList.add("visible");
           fetchedParentText = null;
           fetchedParentData = null;
 
@@ -1362,13 +1388,8 @@
             parentPreview.innerHTML =
               '<span style="color:var(--red)">' + escHtml(err.message) + "</span>";
             parentPreview.classList.add("visible");
-          } finally {
-            fetchBtn.disabled = false;
-            fetchBtn.textContent = "Fetch";
           }
         }
-
-        fetchBtn.addEventListener("click", fetchParentTweet);
 
         // Auto-fetch when pasting a tweet URL
         parentUrlInput.addEventListener("paste", () => {
@@ -1421,6 +1442,10 @@
           const mime = file.type;
           detectedVideoDurationMs = null;
           detectedMediaData = null;
+          if (detectedMediaPreviewUrl) {
+            URL.revokeObjectURL(detectedMediaPreviewUrl);
+            detectedMediaPreviewUrl = null;
+          }
 
           if (mime.startsWith("image/gif")) {
             detectedMedia = "gif";
@@ -1430,16 +1455,16 @@
             readImageAsBase64(file);
           } else if (mime.startsWith("video/")) {
             detectedMedia = "video";
+            // Store blob URL for preview
+            detectedMediaPreviewUrl = URL.createObjectURL(file);
             // Auto-detect video duration
             const videoEl = document.createElement("video");
             videoEl.preload = "metadata";
-            const blobUrl = URL.createObjectURL(file);
             videoEl.onloadedmetadata = () => {
               detectedVideoDurationMs = Math.round(videoEl.duration * 1000);
-              URL.revokeObjectURL(blobUrl);
               updateMediaDisplay();
             };
-            videoEl.src = blobUrl;
+            videoEl.src = detectedMediaPreviewUrl;
           } else {
             detectedMedia = null;
             return;
@@ -1470,6 +1495,7 @@
               const ctx = canvas.getContext("2d");
               ctx.drawImage(img, 0, 0, w, h);
               detectedMediaData = canvas.toDataURL("image/jpeg", 0.85);
+              updateMediaDisplay();
             };
             img.src = e.target.result;
           };
@@ -1478,13 +1504,36 @@
 
         function updateMediaDisplay() {
           dropZone.classList.add("has-media");
-          let label = "Media: <strong>" + detectedMedia + "</strong>";
+
+          let previewHtml = "";
+          if (detectedMedia === "video" && detectedMediaPreviewUrl) {
+            previewHtml =
+              '<video class="media-preview-thumb" src="' +
+              detectedMediaPreviewUrl +
+              '" muted></video>';
+          } else if (detectedMediaData) {
+            previewHtml =
+              '<img class="media-preview-thumb" src="' + detectedMediaData + '" alt="preview" />';
+          }
+
+          let durationHtml = "";
           if (detectedMedia === "video" && detectedVideoDurationMs != null) {
             var secs = (detectedVideoDurationMs / 1000).toFixed(1);
-            label += " <span style='color:var(--text-dim);font-size:0.8rem'>(" + secs + "s)</span>";
+            durationHtml = '<span class="media-preview-duration">' + secs + "s</span>";
           }
-          label += ' <button class="clear-btn" type="button">clear</button>';
-          dropZone.innerHTML = label;
+
+          dropZone.innerHTML =
+            '<div class="media-preview-container">' +
+            previewHtml +
+            '<div class="media-preview-info">' +
+            '<span class="media-preview-type">' +
+            detectedMedia +
+            "</span>" +
+            durationHtml +
+            '<button class="clear-btn" type="button">clear</button>' +
+            "</div>" +
+            "</div>";
+
           dropZone.querySelector(".clear-btn").addEventListener("click", (e) => {
             e.stopPropagation();
             clearMedia();
@@ -1495,6 +1544,10 @@
           detectedMedia = null;
           detectedMediaData = null;
           detectedVideoDurationMs = null;
+          if (detectedMediaPreviewUrl) {
+            URL.revokeObjectURL(detectedMediaPreviewUrl);
+            detectedMediaPreviewUrl = null;
+          }
           fileInput.value = "";
           dropZone.classList.remove("has-media");
           dropZone.innerHTML =
@@ -1516,7 +1569,6 @@
           rankBtn.disabled = true;
           textarea.disabled = true;
           parentUrlInput.disabled = true;
-          fetchBtn.disabled = true;
           btnInNet.disabled = true;
           btnOon.disabled = true;
           tabTweet.disabled = true;
@@ -1528,7 +1580,6 @@
           rankBtn.disabled = false;
           textarea.disabled = false;
           parentUrlInput.disabled = false;
-          fetchBtn.disabled = false;
           btnInNet.disabled = false;
           btnOon.disabled = false;
           tabTweet.disabled = false;
@@ -1664,20 +1715,34 @@
         function probToGrade(p) {
           if (p >= 0.25) return { grade: "SS", css: "grade-ss" };
           if (p >= 0.15) return { grade: "S+", css: "grade-splus" };
-          if (p >= 0.08) return { grade: "S", css: "grade-s" };
+          if (p >= 0.1) return { grade: "S", css: "grade-s" };
+          if (p >= 0.08) return { grade: "S-", css: "grade-s" };
+          if (p >= 0.06) return { grade: "A+", css: "grade-a" };
           if (p >= 0.04) return { grade: "A", css: "grade-a" };
+          if (p >= 0.03) return { grade: "A-", css: "grade-a" };
+          if (p >= 0.025) return { grade: "B+", css: "grade-b" };
           if (p >= 0.02) return { grade: "B", css: "grade-b" };
+          if (p >= 0.015) return { grade: "B-", css: "grade-b" };
+          if (p >= 0.012) return { grade: "C+", css: "grade-c" };
           if (p >= 0.008) return { grade: "C", css: "grade-c" };
+          if (p >= 0.005) return { grade: "C-", css: "grade-c" };
           return { grade: "D", css: "grade-d" };
         }
 
         function scoreToGrade(s) {
           if (s >= 5.0) return { grade: "SS", css: "grade-ss" };
           if (s >= 3.5) return { grade: "S+", css: "grade-splus" };
-          if (s >= 2.0) return { grade: "S", css: "grade-s" };
+          if (s >= 2.5) return { grade: "S", css: "grade-s" };
+          if (s >= 2.0) return { grade: "S-", css: "grade-s" };
+          if (s >= 1.5) return { grade: "A+", css: "grade-a" };
           if (s >= 1.2) return { grade: "A", css: "grade-a" };
-          if (s >= 0.6) return { grade: "B", css: "grade-b" };
-          if (s >= 0.2) return { grade: "C", css: "grade-c" };
+          if (s >= 1.0) return { grade: "A-", css: "grade-a" };
+          if (s >= 0.85) return { grade: "B+", css: "grade-b" };
+          if (s >= 0.7) return { grade: "B", css: "grade-b" };
+          if (s >= 0.6) return { grade: "B-", css: "grade-b" };
+          if (s >= 0.4) return { grade: "C+", css: "grade-c" };
+          if (s >= 0.3) return { grade: "C", css: "grade-c" };
+          if (s >= 0.2) return { grade: "C-", css: "grade-c" };
           return { grade: "D", css: "grade-d" };
         }
 

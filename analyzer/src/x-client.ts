@@ -33,6 +33,7 @@ export interface XTweetData {
   authorName: string;
   authorUsername: string;
   mediaType?: "image" | "video" | "gif";
+  mediaUrl?: string;
 }
 
 export function createXClient(bearerToken: string): Client {
@@ -155,7 +156,7 @@ export async function fetchTweet(client: Client, tweetId: string): Promise<XTwee
   const response = await client.posts.getById(tweetId, {
     tweetFields: ["text", "author_id", "attachments"],
     expansions: ["author_id", "attachments.media_keys"],
-    mediaFields: ["type"],
+    mediaFields: ["type", "url", "preview_image_url"],
     userFields: ["name", "username"],
   });
 
@@ -166,18 +167,27 @@ export async function fetchTweet(client: Client, tweetId: string): Promise<XTwee
 
   // Get author from includes
   const includes = response.includes as
-    | { users?: Array<{ name?: string; username?: string }>; media?: Array<{ type?: string }> }
+    | {
+        users?: Array<{ name?: string; username?: string }>;
+        media?: Array<{ type?: string; url?: string; preview_image_url?: string }>;
+      }
     | undefined;
 
   const author = includes?.users?.[0];
   const media = includes?.media?.[0];
 
+  // Debug: log what we got from the API
+  console.log("[fetchTweet] media response:", JSON.stringify(media, null, 2));
+
   let mediaType: XTweetData["mediaType"] | undefined;
+  let mediaUrl: string | undefined;
   if (media?.type) {
     const t = media.type as string;
     if (t === "animated_gif") mediaType = "gif";
     else if (t === "video") mediaType = "video";
     else if (t === "photo") mediaType = "image";
+    // Use preview_image_url for videos/gifs, url for photos
+    mediaUrl = media.preview_image_url ?? media.url;
   }
 
   return {
@@ -186,6 +196,7 @@ export async function fetchTweet(client: Client, tweetId: string): Promise<XTwee
     authorName: (author?.name ?? "Unknown") as string,
     authorUsername: (author?.username ?? "unknown") as string,
     mediaType,
+    mediaUrl,
   };
 }
 

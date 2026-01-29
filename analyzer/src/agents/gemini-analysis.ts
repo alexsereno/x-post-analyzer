@@ -74,7 +74,7 @@ function buildPrompt(
 Tweet text: "${input.text}"
 ${input.isReply && input.parentText ? `Replying to: "${input.parentText}"` : ""}
 ${input.isQuote && input.parentText ? `Quoting: "${input.parentText}"` : ""}
-${input.media && input.media !== "none" ? `Media: ${input.media}` : ""}
+${input.media && input.media !== "none" ? `Media: ${input.media}${input.mediaData ? " (image attached below - analyze its content and how it complements the tweet)" : ""}` : ""}
 ${input.followers !== undefined ? `Follower count: ${input.followers.toLocaleString()}` : ""}
 
 ## How the Algorithm Weights Engagement
@@ -105,6 +105,20 @@ The algorithm massively rewards content that drives replies, follows, quotes, an
 - **Emojis**: Do NOT suggest adding emojis. They do not improve algorithmic scoring and make posts look less authentic. Never add emojis to the revised tweet unless the original already uses them intentionally.
 - **Engagement bait**: Do NOT suggest "like and retweet" CTAs, follow-begging, or similar tactics. The algorithm penalizes inauthentic engagement patterns.
 - **Thread hooks**: Do NOT suggest "thread 🧵" or "1/" style thread openers for standalone tweets.
+- **Explicit questions to bait replies**: Do NOT suggest adding questions like "What do you think?" or "Have you experienced this?" to the end of tweets. If you ask a question and nobody responds, you look desperate. The best reply-driving tweets INVITE questions without asking them explicitly.
+- **Padding for length**: X now supports long-form tweets, but longer is NOT better. Write the minimum length needed to land the point with impact. A tight 60-character banger outperforms a padded 280-character version. Never add filler words, unnecessary context, or redundant phrases. If the revised tweet can be shorter without losing punch, make it shorter.
+
+## How to Actually Drive Replies (High-Value Tactics)
+
+The best tweets make people WANT to respond without begging for it. Tactics that work:
+
+- **Personal stakes + uncertainty**: Share something you're about to do or going through. Example: "I am about to go under the SMILE laser to have my vision laser-corrected. The doctors are putting me on Valium. Wish me luck!" — This naturally invites "good luck!" replies, questions about the procedure, and people sharing their own experiences. No question asked, but replies flow naturally.
+- **Intriguing incompleteness**: Leave something unsaid that people will want to ask about. Tease information rather than dumping it all.
+- **Contrarian or surprising takes**: State something that challenges assumptions. People reply to disagree, add nuance, or validate.
+- **Relatable struggles or wins**: Personal updates that others identify with generate "same!" and story-sharing replies.
+- **Expertise flex with implicit invitation**: Share knowledge in a way that invites follow-up questions ("After 10 years of X, here's what I've learned...").
+
+The goal is to create a "reply vacuum" — content so engaging that NOT responding feels like missing out.
 
 ## Engagement Probabilities (from Grok-3-mini)
 ${Object.entries(result.phoenixScores)
@@ -143,11 +157,30 @@ export async function analyzeWithGemini(
 ): Promise<GeminiAnalysisResult> {
   const url = `${GEMINI_API_URL}/${model}:generateContent?key=${apiKey}`;
 
+  // Build parts array - text first, then image if available
+  const parts: Array<Record<string, unknown>> = [{ text: buildPrompt(input, result, priorRuns) }];
+
+  // Add image if mediaData is provided (base64 data URI)
+  if (input.mediaData) {
+    const match = input.mediaData.match(/^data:([^;]+);base64,(.+)$/);
+    if (match) {
+      const [, mimeType, base64Data] = match;
+      parts.push({
+        inline_data: {
+          mime_type: mimeType,
+          data: base64Data,
+        },
+      });
+      const sizeKb = Math.round((base64Data.length * 3) / 4 / 1024);
+      console.log(`[Gemini] Including image: ${mimeType}, ~${sizeKb}KB`);
+    }
+  }
+
   const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: buildPrompt(input, result, priorRuns) }] }],
+      contents: [{ parts }],
       generationConfig: {
         responseMimeType: "application/json",
         responseSchema: {

@@ -20,11 +20,13 @@ import { applyAuthorDiversity } from "./scoring/author-diversity-scorer.js";
 import { applyOonScoring } from "./scoring/oon-scorer.js";
 import { estimateEngagement } from "./agents/grok-engagement.js";
 import { analyzeWithGemini } from "./agents/gemini-analysis.js";
+import { describeImage } from "./agents/image-description.js";
 import { getXApiUsage } from "./x-client.js";
 
 export interface ComputeScoresResult {
   scored: ScoredResult;
   grokUsage: TokenUsage;
+  imageDescriptionUsage?: { inputTokens: number; outputTokens: number };
 }
 
 /** Stages 1–4: Grok engagement estimation + scoring pipeline */
@@ -32,14 +34,35 @@ export async function computeScores(
   input: TweetInput,
   xaiKey: string,
   grokModel: string,
-  calibration?: CalibrationTweet[] | null
+  calibration?: CalibrationTweet[] | null,
+  geminiKey?: string,
+  geminiFlashModel?: string
 ): Promise<ComputeScoresResult> {
+  // Stage 0: Describe image with Gemini Flash if present
+  let imageDescription: string | undefined;
+  let imageDescriptionUsage: { inputTokens: number; outputTokens: number } | undefined;
+
+  if (input.mediaData && geminiKey && geminiFlashModel) {
+    try {
+      const result = await describeImage(input.mediaData, geminiKey, geminiFlashModel);
+      imageDescription = result.description;
+      imageDescriptionUsage = {
+        inputTokens: result.inputTokens,
+        outputTokens: result.outputTokens,
+      };
+      console.log(`[Image] Described: "${imageDescription.slice(0, 100)}..."`);
+    } catch (err) {
+      console.error("[Image] Failed to describe:", err);
+    }
+  }
+
   // Stage 1: Grok estimates engagement probabilities
   const { scores: phoenixScores, usage: grokUsage } = await estimateEngagement(
     input,
     xaiKey,
     grokModel,
-    calibration
+    calibration,
+    imageDescription
   );
 
   // Stage 2: Weighted scorer
@@ -66,6 +89,7 @@ export async function computeScores(
       finalScore: oon.adjustedScore,
     },
     grokUsage,
+    imageDescriptionUsage,
   };
 }
 

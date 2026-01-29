@@ -212,6 +212,8 @@ const server = createServer(async (req, res) => {
   // Stage 1–4: Score tweet (Grok + scoring pipeline)
   if (req.method === "POST" && url.pathname === "/api/score") {
     const xaiKey = process.env.XAI_API_KEY;
+    const geminiKey = process.env.GEMINI_API_KEY;
+    const geminiFlashModel = process.env.GEMINI_FLASH_MODEL;
     if (!xaiKey) {
       res.writeHead(500, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "XAI_API_KEY not configured on server" }));
@@ -236,8 +238,30 @@ const server = createServer(async (req, res) => {
     try {
       resetXApiUsage();
       const input = parseTweetInput(payload);
-      const { scored, grokUsage } = await computeScores(input, xaiKey, grokModel, calibrationData);
+      const { scored, grokUsage } = await computeScores(
+        input,
+        xaiKey,
+        grokModel,
+        calibrationData,
+        geminiKey,
+        geminiFlashModel
+      );
       const cost = calculateCost(grokUsage);
+
+      // Debug: log scoring breakdown
+      const topContribs = [...scored.weightBreakdown]
+        .sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution))
+        .slice(0, 5)
+        .map((w) => `${w.action}=${w.contribution.toFixed(3)}`)
+        .join(", ");
+      console.log(
+        `[Score] final=${scored.finalScore.toFixed(3)} raw=${scored.rawWeightedScore.toFixed(3)} | top: ${topContribs}`
+      );
+      // Log key high-weight predictions
+      const ps = scored.phoenixScores;
+      console.log(
+        `[Grok predictions] followAuthor=${(ps.followAuthorScore * 100).toFixed(2)}% quote=${(ps.quoteScore * 100).toFixed(2)}% reply=${(ps.replyScore * 100).toFixed(2)}% share=${(ps.shareScore * 100).toFixed(2)}% shareViaDm=${(ps.shareViaDmScore * 100).toFixed(2)}%`
+      );
 
       // Persist to database
       const runId = generateRunId();
