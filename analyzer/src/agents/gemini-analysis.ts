@@ -26,6 +26,35 @@ ${input.isQuote && input.parentText ? `Quoting: "${input.parentText}"` : ""}
 ${input.media && input.media !== "none" ? `Media: ${input.media}` : ""}
 ${input.followers !== undefined ? `Follower count: ${input.followers.toLocaleString()}` : ""}
 
+## How the Algorithm Weights Engagement
+
+The scoring formula is Score = Σ(weight × probability). These are the weights, from most to least impactful:
+
+**Highest value actions (what to optimize for):**
+- followAuthor (12.0) — the single most valuable signal. Content that makes people follow you is king.
+- reply (11.0) — replies are almost as valuable as follows. Conversation-starting content wins.
+- quote (8.0) — quote tweets signal strong engagement. Tweetable, commentable ideas score high.
+- shareViaDm (6.0) and share (5.0) — content people want to send to friends is heavily rewarded.
+- retweet (4.0) — straightforward amplification signal.
+
+**Medium value:**
+- shareViaCopyLink (3.0), profileClick (1.5), favorite (1.0)
+
+**Low value:**
+- vqv (0.8), dwell (0.5), click (0.5), photoExpand (0.3)
+
+**Severe penalties:**
+- report (-200.0), notInterested/blockAuthor/muteAuthor (-74.0 each)
+
+The algorithm massively rewards content that drives replies, follows, quotes, and sharing — not just likes. A tweet that gets 100 likes but no replies scores far worse than one with fewer likes but many replies and quotes.
+
+## Things That Do NOT Help (Do Not Suggest These)
+
+- **Hashtags**: Do NOT suggest adding hashtags. X's CEO has publicly stated multiple times that hashtags hurt distribution. The algorithm does not boost posts with hashtags — they look spammy and reduce reach.
+- **Emojis**: Do NOT suggest adding emojis. They do not improve algorithmic scoring and make posts look less authentic. Never add emojis to the revised tweet unless the original already uses them intentionally.
+- **Engagement bait**: Do NOT suggest "like and retweet" CTAs, follow-begging, or similar tactics. The algorithm penalizes inauthentic engagement patterns.
+- **Thread hooks**: Do NOT suggest "thread 🧵" or "1/" style thread openers for standalone tweets.
+
 ## Engagement Probabilities (from Grok-3-mini)
 ${Object.entries(result.phoenixScores)
   .map(([k, v]) => `  ${k}: ${(v as number).toFixed(4)}`)
@@ -41,12 +70,12 @@ After author diversity (×${result.diversityMultiplier.toFixed(2)}): ${result.di
 After OON adjustment (×${result.oonMultiplier.toFixed(2)}): ${result.finalScore.toFixed(4)}
 
 Provide your analysis as JSON with these fields:
-- assessment: 2-3 sentence overall assessment
+- assessment: 2-3 sentence overall assessment. Reference the specific weight values to explain why the score is what it is.
 - viralityRating: integer 1-10
-- strengths: array of 2-4 strengths, each referencing which P(action) it relates to
-- weaknesses: array of 2-4 weaknesses, each referencing which P(action) it relates to
-- suggestions: array of 2-4 actionable suggestions, each noting which P(action) it would improve
-- revisedTweet: a revised version of the tweet incorporating your suggestions`;
+- strengths: array of 2-4 strengths, each referencing which P(action) it relates to and its weight
+- weaknesses: array of 2-4 weaknesses, each referencing which P(action) it relates to and its weight
+- suggestions: array of 2-4 actionable suggestions focused on driving replies, follows, quotes, and shares (the highest-weighted actions). Each should note which P(action) it would improve and why that matters given the weight.
+- revisedTweet: a revised version of the tweet incorporating your suggestions. Do NOT add hashtags or emojis unless the original tweet already uses them.`;
 }
 
 export interface GeminiAnalysisResult {
