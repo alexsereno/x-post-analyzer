@@ -31,6 +31,7 @@ export interface TweetInput {
   parentText?: string;
   videoDurationMs?: number;
   inNetwork?: boolean;
+  mediaData?: string; // base64 data URI (e.g. "data:image/jpeg;base64,...")
 }
 
 /** Result after all scoring stages */

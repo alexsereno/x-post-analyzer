@@ -903,6 +903,40 @@
         font-style: italic;
       }
 
+      /* Month dividers in sidebar */
+      .month-divider {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 16px 6px;
+        font-size: 0.72rem;
+        color: var(--text-dim);
+        border-bottom: 1px solid var(--border);
+        position: sticky;
+        top: 0;
+        background: var(--surface);
+        z-index: 1;
+      }
+
+      .month-divider-label {
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--text);
+        font-size: 0.7rem;
+      }
+
+      .month-divider-cost {
+        font-variant-numeric: tabular-nums;
+        color: var(--accent);
+        font-weight: 600;
+      }
+
+      .month-divider-runs {
+        color: var(--text-dim);
+        margin-left: 6px;
+      }
+
       /* Cost summary */
       .cost-summary {
         display: flex;
@@ -1132,6 +1166,7 @@
 
         let tweetType = "tweet";
         let detectedMedia = null;
+        let detectedMediaData = null;
         let detectedVideoDurationMs = null;
         let fetchedParentText = null;
         let fetchedParentData = null;
@@ -1197,7 +1232,7 @@
             const resp = await fetch("/api/usage");
             const data = await resp.json();
             if (data.error) return;
-            sidebarUsage.textContent =
+            sidebarUsage.innerHTML =
               data.reads +
               "/" +
               data.readLimit +
@@ -1205,7 +1240,17 @@
               data.writes +
               "/" +
               data.writeLimit +
-              " posts";
+              " posts" +
+              (data.monthlyCost != null
+                ? '<br><span style="color:var(--accent)">$' +
+                  data.monthlyCost.toFixed(4) +
+                  "</span> this month" +
+                  " (" +
+                  data.monthlyRunCount +
+                  " run" +
+                  (data.monthlyRunCount !== 1 ? "s" : "") +
+                  ")"
+                : "");
           } catch {
             // Usage load is optional
           }
@@ -1375,11 +1420,14 @@
         function handleFile(file) {
           const mime = file.type;
           detectedVideoDurationMs = null;
+          detectedMediaData = null;
 
           if (mime.startsWith("image/gif")) {
             detectedMedia = "gif";
+            readImageAsBase64(file);
           } else if (mime.startsWith("image/")) {
             detectedMedia = "image";
+            readImageAsBase64(file);
           } else if (mime.startsWith("video/")) {
             detectedMedia = "video";
             // Auto-detect video duration
@@ -1399,6 +1447,35 @@
           updateMediaDisplay();
         }
 
+        function readImageAsBase64(file) {
+          const reader = new FileReader();
+          reader.onload = function (e) {
+            const img = new Image();
+            img.onload = function () {
+              const MAX_DIM = 1024;
+              let w = img.width;
+              let h = img.height;
+              if (w > MAX_DIM || h > MAX_DIM) {
+                if (w > h) {
+                  h = Math.round(h * (MAX_DIM / w));
+                  w = MAX_DIM;
+                } else {
+                  w = Math.round(w * (MAX_DIM / h));
+                  h = MAX_DIM;
+                }
+              }
+              const canvas = document.createElement("canvas");
+              canvas.width = w;
+              canvas.height = h;
+              const ctx = canvas.getContext("2d");
+              ctx.drawImage(img, 0, 0, w, h);
+              detectedMediaData = canvas.toDataURL("image/jpeg", 0.85);
+            };
+            img.src = e.target.result;
+          };
+          reader.readAsDataURL(file);
+        }
+
         function updateMediaDisplay() {
           dropZone.classList.add("has-media");
           let label = "Media: <strong>" + detectedMedia + "</strong>";
@@ -1416,6 +1493,7 @@
 
         function clearMedia() {
           detectedMedia = null;
+          detectedMediaData = null;
           detectedVideoDurationMs = null;
           fileInput.value = "";
           dropZone.classList.remove("has-media");
@@ -1482,6 +1560,7 @@
           const payload = {
             text,
             media: media || undefined,
+            mediaData: detectedMediaData || undefined,
             followers,
             isReply: tweetType === "reply",
             isQuote: tweetType === "quote",
@@ -1931,34 +2010,86 @@
         async function refreshSidebar() {
           try {
             const resp = await fetch("/api/history");
-            const entries = await resp.json();
-            if (entries.error) return;
-            renderSidebarFromEntries(entries);
+            const data = await resp.json();
+            if (data.error) return;
+            var entries = data.entries || [];
+            var monthlyCosts = data.monthlyCosts || [];
+            renderSidebarFromEntries(entries, monthlyCosts);
           } catch {
             // Sidebar refresh is non-critical
           }
         }
 
-        function renderSidebarFromEntries(entries) {
+        function entryMonthKey(timestamp) {
+          var d = new Date(timestamp);
+          var y = d.getFullYear();
+          var m = String(d.getMonth() + 1).padStart(2, "0");
+          return y + "-" + m;
+        }
+
+        function formatMonthLabel(monthKey) {
+          var parts = monthKey.split("-");
+          var d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1);
+          return d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+        }
+
+        function renderSidebarFromEntries(entries, monthlyCosts) {
+          // Clear existing content (cards + dividers)
+          sidebarList.querySelectorAll(".history-card, .month-divider").forEach(function (el) {
+            el.remove();
+          });
+
           if (!entries || entries.length === 0) {
             sidebarEmpty.style.display = "";
-            const cards = sidebarList.querySelectorAll(".history-card");
-            cards.forEach((c) => c.remove());
             return;
           }
 
           sidebarEmpty.style.display = "none";
-          let html = "";
-          for (const entry of entries) {
+
+          // Build cost lookup
+          var costMap = {};
+          if (monthlyCosts) {
+            for (var i = 0; i < monthlyCosts.length; i++) {
+              costMap[monthlyCosts[i].month] = monthlyCosts[i];
+            }
+          }
+
+          var html = "";
+          var lastMonth = null;
+          for (var j = 0; j < entries.length; j++) {
+            var entry = entries[j];
+            var month = entryMonthKey(entry.timestamp);
+            if (month !== lastMonth) {
+              var costInfo = costMap[month];
+              var costHtml = costInfo
+                ? '<span class="month-divider-cost">$' +
+                  costInfo.totalCost.toFixed(4) +
+                  "</span>" +
+                  '<span class="month-divider-runs">' +
+                  costInfo.runCount +
+                  " run" +
+                  (costInfo.runCount !== 1 ? "s" : "") +
+                  "</span>"
+                : "";
+              html +=
+                '<div class="month-divider">' +
+                '<span class="month-divider-label">' +
+                formatMonthLabel(month) +
+                "</span>" +
+                "<span>" +
+                costHtml +
+                "</span>" +
+                "</div>";
+              lastMonth = month;
+            }
             html += renderHistoryCard(entry);
           }
-          const existingCards = sidebarList.querySelectorAll(".history-card");
-          existingCards.forEach((c) => c.remove());
+
           sidebarEmpty.insertAdjacentHTML("afterend", html);
 
           // Attach click handlers
-          sidebarList.querySelectorAll(".history-card").forEach((card) => {
-            card.addEventListener("click", () => {
+          sidebarList.querySelectorAll(".history-card").forEach(function (card) {
+            card.addEventListener("click", function () {
               viewHistoryEntry(card.dataset.id);
             });
           });

@@ -271,6 +271,63 @@ export interface MonthlyUsage {
   writes: number;
 }
 
+export interface MonthlyCost {
+  month: string;
+  totalCost: number;
+  runCount: number;
+}
+
+export function getMonthlyCost(): MonthlyCost {
+  const month = currentMonth();
+  const [year, mon] = month.split("-").map(Number);
+  const startMs = new Date(year, mon - 1, 1).getTime();
+  const endMs = new Date(year, mon, 1).getTime();
+
+  const row = db
+    .prepare(
+      `SELECT
+        COALESCE(SUM(
+          COALESCE(json_extract(cost_data, '$.scoreCost.totalCost'), 0) +
+          COALESCE(json_extract(cost_data, '$.geminiCost.totalCost'), 0)
+        ), 0) AS total_cost,
+        COUNT(*) AS run_count
+      FROM runs
+      WHERE created_at >= ? AND created_at < ? AND cost_data IS NOT NULL`
+    )
+    .get(startMs, endMs) as { total_cost: number; run_count: number };
+
+  return { month, totalCost: row.total_cost, runCount: row.run_count };
+}
+
+export interface MonthCostEntry {
+  month: string;
+  totalCost: number;
+  runCount: number;
+}
+
+export function getAllMonthlyCosts(): MonthCostEntry[] {
+  const rows = db
+    .prepare(
+      `SELECT
+        strftime('%Y-%m', created_at / 1000, 'unixepoch') AS month,
+        COALESCE(SUM(
+          COALESCE(json_extract(cost_data, '$.scoreCost.totalCost'), 0) +
+          COALESCE(json_extract(cost_data, '$.geminiCost.totalCost'), 0)
+        ), 0) AS total_cost,
+        COUNT(*) AS run_count
+      FROM runs
+      GROUP BY month
+      ORDER BY month DESC`
+    )
+    .all() as Array<{ month: string; total_cost: number; run_count: number }>;
+
+  return rows.map((r) => ({
+    month: r.month,
+    totalCost: r.total_cost,
+    runCount: r.run_count,
+  }));
+}
+
 export function getMonthlyUsage(): MonthlyUsage {
   const month = currentMonth();
   const rows = db

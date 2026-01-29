@@ -97,6 +97,7 @@ You were trained on massive X data — use your intuition about how tweets perfo
   const factors = `Factors to consider:
 - Text length, clarity, and emotional valence
 - Media type (images boost photoExpand, videos boost vqv; no media → those scores should be 0)
+- If the actual image/GIF is provided, analyze its visual content (subject, quality, composition, emotional impact) to refine engagement estimates
 - Call-to-action presence (questions boost reply, "RT if" boosts retweet)
 - Controversy potential (increases both engagement AND negative signals)
 - Follower context (larger audiences have lower per-viewer engagement rates)
@@ -184,14 +185,15 @@ export interface GrokEngagementResult {
   usage: TokenUsage;
 }
 
-export async function estimateEngagement(
-  input: TweetInput,
-  apiKey: string,
+async function callGrokApi(
+  systemPrompt: string,
+  userContent: string | Array<Record<string, unknown>>,
   model: string,
-  calibration?: CalibrationTweet[] | null
-): Promise<GrokEngagementResult> {
-  const systemPrompt = buildSystemPrompt(calibration ?? null);
-
+  apiKey: string
+): Promise<{
+  content: string;
+  usage: { prompt_tokens: number; completion_tokens: number; cached_tokens: number };
+}> {
   const response = await fetch(XAI_API_URL, {
     method: "POST",
     headers: {
@@ -202,7 +204,7 @@ export async function estimateEngagement(
       model,
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: buildUserPrompt(input) },
+        { role: "user", content: userContent },
       ],
       response_format: {
         type: "json_schema",
@@ -231,12 +233,48 @@ export async function estimateEngagement(
     throw new Error("xAI API returned no content");
   }
 
-  const rawScores = JSON.parse(content) as PhoenixScores;
+  return {
+    content,
+    usage: {
+      prompt_tokens: data.usage?.prompt_tokens ?? 0,
+      completion_tokens: data.usage?.completion_tokens ?? 0,
+      cached_tokens: data.usage?.prompt_tokens_details?.cached_tokens ?? 0,
+    },
+  };
+}
+
+export async function estimateEngagement(
+  input: TweetInput,
+  apiKey: string,
+  model: string,
+  calibration?: CalibrationTweet[] | null
+): Promise<GrokEngagementResult> {
+  const systemPrompt = buildSystemPrompt(calibration ?? null);
+  const userText = buildUserPrompt(input);
+
+  let result: Awaited<ReturnType<typeof callGrokApi>>;
+
+  if (input.mediaData) {
+    // Try multimodal first; fall back to text-only if the model doesn't support vision
+    const multimodalContent: Array<Record<string, unknown>> = [
+      { type: "image_url", image_url: { url: input.mediaData } },
+      { type: "text", text: userText },
+    ];
+    try {
+      result = await callGrokApi(systemPrompt, multimodalContent, model, apiKey);
+    } catch {
+      result = await callGrokApi(systemPrompt, userText, model, apiKey);
+    }
+  } else {
+    result = await callGrokApi(systemPrompt, userText, model, apiKey);
+  }
+
+  const rawScores = JSON.parse(result.content) as PhoenixScores;
   const scores = clampScores(rawScores, input);
   const usage: TokenUsage = {
-    inputTokens: data.usage?.prompt_tokens ?? 0,
-    outputTokens: data.usage?.completion_tokens ?? 0,
-    cachedTokens: data.usage?.prompt_tokens_details?.cached_tokens ?? 0,
+    inputTokens: result.usage.prompt_tokens,
+    outputTokens: result.usage.completion_tokens,
+    cachedTokens: result.usage.cached_tokens,
     model,
   };
 

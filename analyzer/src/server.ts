@@ -26,6 +26,8 @@ import {
   getRun,
   incrementXApiUsage,
   getMonthlyUsage,
+  getMonthlyCost,
+  getAllMonthlyCosts,
 } from "./db.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -70,6 +72,7 @@ function parseTweetInput(payload: Record<string, unknown>): TweetInput {
     parentText: payload.parentText as string | undefined,
     videoDurationMs: payload.videoDurationMs as number | undefined,
     inNetwork: (payload.inNetwork as boolean) ?? false,
+    mediaData: payload.mediaData as string | undefined,
   };
 }
 
@@ -145,8 +148,9 @@ const server = createServer(async (req, res) => {
   if (req.method === "GET" && url.pathname === "/api/history") {
     try {
       const runs = listRuns();
+      const monthlyCosts = getAllMonthlyCosts();
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify(runs));
+      res.end(JSON.stringify({ entries: runs, monthlyCosts }));
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error";
       res.writeHead(500, { "Content-Type": "application/json" });
@@ -185,8 +189,17 @@ const server = createServer(async (req, res) => {
   if (req.method === "GET" && url.pathname === "/api/usage") {
     try {
       const usage = getMonthlyUsage();
+      const cost = getMonthlyCost();
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ ...usage, readLimit: 100, writeLimit: 500 }));
+      res.end(
+        JSON.stringify({
+          ...usage,
+          readLimit: 100,
+          writeLimit: 500,
+          monthlyCost: cost.totalCost,
+          monthlyRunCount: cost.runCount,
+        })
+      );
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error";
       res.writeHead(500, { "Content-Type": "application/json" });
